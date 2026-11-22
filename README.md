@@ -26,7 +26,7 @@ curl -XPOST localhost:8080/api/index -H 'content-type: application/json' -d '{"t
 | `SEARCH_THREADS` | кількість ядер | потоки за замовчуванням для індексації |
 | `OLLAMA_URL` | `http://ollama:11434` | адреса Ollama |
 | `OLLAMA_MODEL` | `gemma4:e2b` | модель |
-| `OLLAMA_TIMEOUT_MS` | `30000` | таймаут розширення запиту |
+| `OLLAMA_TIMEOUT_MS` | `60000` | таймаут розширення запиту |
 | `OLLAMA_NUM_THREAD` | `4` | потоки Ollama; задайте кількість продуктивних ядер (efficiency-ядра гальмують генерацію) |
 
 ## Датасет
@@ -63,6 +63,8 @@ curl -XPOST localhost:8080/api/index -H 'content-type: application/json' -d '{"t
 - `expand` — за замовчуванням `true`; якщо `false`, розширення пропускається, `expanded_terms` порожній;
 - `top_k` — від 1 до 100, за замовчуванням 10 (значення поза діапазоном обрізається);
 - 400 — немає `query`, запит задовгий або невідомий `mode`; 409 — `index not built`.
+
+Некоректний JSON або відсутній `Content-Type: application/json` дають 400/415 фреймворку без тіла `{"error"}`.
 
 `GET /api/doc/{doc_id}`: `doc_id` може містити `/`; 404 — `document not found`.
 
@@ -101,7 +103,7 @@ curl -XPOST localhost:8080/api/index -H 'content-type: application/json' -d '{"t
 - `--server URL` — адреса сервера (за замовчуванням `$SEARCH_SERVER` або `http://localhost:8080`);
 - `--help` — довідка.
 
-Потрібен .NET SDK; перший запуск `./search` збирає CLI автоматично.
+Потрібен .NET SDK; перший запуск `./search` збирає CLI автоматично. Без SDK на хості `./search` запускає CLI в контейнері `dotnet/sdk` (потрібен Docker).
 
 ## Веб-інтерфейс
 

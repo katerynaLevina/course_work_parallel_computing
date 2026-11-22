@@ -31,11 +31,12 @@ public static class IndexBuilder
 
         // Parallel: one pool job per batch of files (reading, tokenizing and counting are independent per file).
         // Only terms.Add touches shared state, and the index locks per segment.
+        var batchSize = Math.Clamp(files.Count / (o.Threads * Defaults.BatchesPerThread), 1, o.BatchSize);
         var batches = new List<Task>();
-        for (var first = 0; first < files.Count; first += o.BatchSize)
+        for (var first = 0; first < files.Count; first += batchSize)
         {
             var start = first;
-            var end = Math.Min(first + o.BatchSize, files.Count);
+            var end = Math.Min(first + batchSize, files.Count);
             batches.Add(pool.Submit(() =>
             {
                 ct.ThrowIfCancellationRequested();
@@ -80,12 +81,20 @@ public static class IndexBuilder
 
     private static string TitleOf(string text, string path)
     {
-        var firstLine = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0);
-        if (firstLine is null)
+        // Scan line by line instead of splitting the whole document: only the first non-empty line is needed.
+        for (var start = 0; start < text.Length;)
         {
-            return Path.GetFileName(path);
+            var newline = text.IndexOf('\n', start);
+            var end = newline < 0 ? text.Length : newline;
+            var line = text.AsSpan(start, end - start).Trim();
+            if (line.Length > 0)
+            {
+                return line.Length > Defaults.TitleMaxLength ? line[..Defaults.TitleMaxLength].ToString() : line.ToString();
+            }
+
+            start = end + 1;
         }
 
-        return firstLine.Length > Defaults.TitleMaxLength ? firstLine[..Defaults.TitleMaxLength] : firstLine;
+        return Path.GetFileName(path);
     }
 }

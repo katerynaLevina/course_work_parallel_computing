@@ -8,12 +8,13 @@ namespace SearchCli;
 public sealed class ApiClient(string server) : IDisposable
 {
     private readonly HttpClient http = new() { BaseAddress = new Uri(server), Timeout = CliDefaults.HttpTimeout };
+    private readonly HttpClient indexHttp = new() { BaseAddress = new Uri(server), Timeout = CliDefaults.IndexTimeout };
 
     public Task<SearchResponse> SearchAsync(string query, int topK, bool expand, CancellationToken ct) =>
-        PostAsync<SearchResponse>(ApiRoutes.Search, new SearchRequest(query, ApiRoutes.SearchModeKeyword, expand, topK), ct);
+        PostAsync<SearchResponse>(http, ApiRoutes.Search, new SearchRequest(query, ApiRoutes.SearchModeKeyword, expand, topK), ct);
 
     public Task<IndexResponse> IndexAsync(int? threads, CancellationToken ct) =>
-        PostAsync<IndexResponse>(ApiRoutes.Index, new IndexRequest(threads, null, null), ct);
+        PostAsync<IndexResponse>(indexHttp, ApiRoutes.Index, new IndexRequest(threads, null, null), ct);
 
     public Task<StatsResponse> StatsAsync(CancellationToken ct) => GetAsync<StatsResponse>(ApiRoutes.Stats, ct);
 
@@ -50,7 +51,11 @@ public sealed class ApiClient(string server) : IDisposable
         }
     }
 
-    public void Dispose() => http.Dispose();
+    public void Dispose()
+    {
+        http.Dispose();
+        indexHttp.Dispose();
+    }
 
     private static async Task<StageMessage?> ReceiveAsync(ClientWebSocket socket, CancellationToken ct)
     {
@@ -75,8 +80,8 @@ public sealed class ApiClient(string server) : IDisposable
     private async Task<T> GetAsync<T>(string route, CancellationToken ct) =>
         await ReadAsync<T>(await http.GetAsync(route, ct), ct);
 
-    private async Task<T> PostAsync<T>(string route, object body, CancellationToken ct) =>
-        await ReadAsync<T>(await http.PostAsJsonAsync(route, body, ApiRoutes.Json, ct), ct);
+    private static async Task<T> PostAsync<T>(HttpClient client, string route, object body, CancellationToken ct) =>
+        await ReadAsync<T>(await client.PostAsJsonAsync(route, body, ApiRoutes.Json, ct), ct);
 
     /// <summary>The server's error text, or a generic status message when the body is not an error JSON object.</summary>
     public static async Task<string> ErrorMessageAsync(HttpResponseMessage response, CancellationToken ct)

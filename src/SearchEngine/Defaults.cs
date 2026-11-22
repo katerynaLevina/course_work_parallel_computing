@@ -15,6 +15,8 @@ public static class Defaults
 
     public const int IndexSegments = 256;
     public const int IndexBatchSize = 64;
+    // Smaller batches on small corpora so every build thread gets several of them.
+    public const int BatchesPerThread = 4;
     public const int IndexBuildThreads = 4;
     public const int TitleMaxLength = 200;
     public const int SegmentInitialBuckets = 16;
@@ -42,10 +44,11 @@ public static class Defaults
     public const string OllamaModel = "gemma4:e2b";
 
     public const string OllamaTimeoutMsEnv = "OLLAMA_TIMEOUT_MS";
-    public const int OllamaTimeoutMs = 30000;
+    public const int OllamaTimeoutMs = 60000;
 
     public const string OllamaNumThreadEnv = "OLLAMA_NUM_THREAD";
-    // Performance cores of the target Mac: efficiency cores stall llama.cpp, which synchronises threads every step.
+    // Tuned for the performance cores of the target Mac (efficiency cores stall llama.cpp, which synchronises threads
+    // every step); override with OLLAMA_NUM_THREAD.
     public const int OllamaNumThread = 4;
 
     public const string OllamaTagsPath = "/api/tags";

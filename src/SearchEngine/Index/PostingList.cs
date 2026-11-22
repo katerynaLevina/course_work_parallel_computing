@@ -22,5 +22,9 @@ public sealed class PostingList
 
     public ReadOnlySpan<Posting> AsSpan() => _items.AsSpan(0, Count);
 
-    public void SortByDocId() => _items.AsSpan(0, Count).Sort((a, b) => a.DocId.CompareTo(b.DocId));
+    public void SortByDocId()
+    {
+        Array.Resize(ref _items, Count); // frozen lists are never appended to, so drop the growth slack
+        _items.AsSpan().Sort((a, b) => a.DocId.CompareTo(b.DocId));
+    }
 }

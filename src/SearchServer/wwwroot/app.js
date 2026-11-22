@@ -216,6 +216,8 @@ function closePreview() {
 function clearAll() {
   latest++; // a search still in flight no longer renders
   input.value = "";
+  lastQuery = "";
+  selected = -1;
   results = [];
   closePreview();
   resultsList.replaceChildren();

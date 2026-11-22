@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+sdk_image="mcr.microsoft.com/dotnet/sdk:11.0"
+docker_server="http://host.docker.internal:8080"
+
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project="$repo/src/SearchCli"
 binary="$project/bin/publish/SearchCli"
@@ -8,6 +11,13 @@ binary="$project/bin/publish/SearchCli"
 stale() {
   [[ ! -x "$binary" ]] || [[ -n "$(find "$project" -name '*.cs' -not -path '*/obj/*' -not -path '*/bin/*' -newer "$binary" -print -quit)" ]]
 }
+
+# No .NET SDK on the host: run the CLI inside the SDK container instead.
+if ! command -v dotnet >/dev/null 2>&1; then
+  exec docker run --rm -v "$repo":/src -w /src --add-host=host.docker.internal:host-gateway \
+    -e SEARCH_SERVER="${SEARCH_SERVER:-$docker_server}" \
+    "$sdk_image" dotnet run --project src/SearchCli -c Release -- "$@"
+fi
 
 if stale; then
   dotnet publish "$project" -c Release -o "$project/bin/publish" --nologo -v quiet >&2
