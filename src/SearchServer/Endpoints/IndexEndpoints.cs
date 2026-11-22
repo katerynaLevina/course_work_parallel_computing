@@ -50,7 +50,7 @@ public static class IndexEndpoints
         }
     }
 
-    private static IResult Error(int status, string message) => Results.Json(new ErrorResponse(message), ApiRoutes.Json, statusCode: status);
+    internal static IResult Error(int status, string message) => Results.Json(new ErrorResponse(message), ApiRoutes.Json, statusCode: status);
 
     private static bool TryParseMode(string? text, out LockMode mode)
     {

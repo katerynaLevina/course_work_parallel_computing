@@ -11,6 +11,28 @@ public sealed class FakeOllamaHealth : IOllamaHealth
     public Task<bool> IsAvailableAsync(CancellationToken ct) => Task.FromResult(Available);
 }
 
+public sealed class FakeExpander : IQueryExpander
+{
+    private int _calls;
+
+    public IReadOnlyList<string> Terms { get; set; } = [];
+
+    public TimeSpan Delay { get; set; }
+
+    public int Calls => Volatile.Read(ref _calls);
+
+    public async Task<ExpansionResult> ExpandAsync(string query, CancellationToken ct)
+    {
+        Interlocked.Increment(ref _calls);
+        if (Delay > TimeSpan.Zero)
+        {
+            await Task.Delay(Delay, ct);
+        }
+
+        return new ExpansionResult(Terms, null);
+    }
+}
+
 public sealed class ServerFactory : WebApplicationFactory<Program>
 {
     public const int CorpusSize = 20;
@@ -26,6 +48,8 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
 
     public FakeOllamaHealth FakeOllama { get; } = new();
 
+    public FakeExpander Expander { get; } = new();
+
     /// <summary>Corpus directory the server indexes; set before the first request to point it elsewhere.</summary>
     public string DataDir { get; set; }
 
@@ -33,6 +57,7 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(s =>
         {
             s.AddSingleton<IOllamaHealth>(FakeOllama);
+            s.AddSingleton<IQueryExpander>(Expander);
             s.AddSingleton(ServerOptions.FromEnvironment() with { DataDir = DataDir });
         });
 

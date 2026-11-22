@@ -9,3 +9,11 @@ public record IndexResponse(string Status, int DocumentsIndexed, long TimeMs, in
 public record StatsResponse(int Documents, long IndexBuildTimeMs, int ThreadsUsed, int Terms, long Postings, string LockMode);
 
 public record ErrorResponse(string Error);
+
+public record SearchRequest(string? Query, string? Mode, bool? Expand, int? TopK);
+
+public record SearchResultDto(string DocId, double Score, string Snippet, string Title);
+
+public record SearchResponse(IReadOnlyList<SearchResultDto> Results, long TimeMs, IReadOnlyList<string> ExpandedTerms);
+
+public record DocResponse(string DocId, string Title, string Text);

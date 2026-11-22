@@ -1,0 +1,151 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using SearchContracts;
+
+namespace SearchServer.Tests;
+
+public class SearchEndpointTests
+{
+    private static Task<HttpResponseMessage> Post(HttpClient c, string route, string body) =>
+        c.PostAsync(route, new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+
+    private static async Task<HttpClient> IndexedClient(ServerFactory f)
+    {
+        var c = f.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await Post(c, ApiRoutes.Index, "{\"threads\":2}")).StatusCode);
+        return c;
+    }
+
+    private static async Task<SearchResponse> Search(HttpClient c, string body)
+    {
+        var r = await Post(c, ApiRoutes.Search, body);
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        return (await r.Content.ReadFromJsonAsync<SearchResponse>(ApiRoutes.Json))!;
+    }
+
+    [Fact]
+    public async Task Search_returns_contract_shape()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        var r = await Post(c, ApiRoutes.Search, "{\"query\":\"term3\",\"mode\":\"keyword\"}");
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        using var doc = JsonDocument.Parse(await r.Content.ReadAsStringAsync());
+        var first = doc.RootElement.GetProperty("results")[0];
+        Assert.Equal("doc03", first.GetProperty("doc_id").GetString());
+        Assert.True(first.GetProperty("score").GetDouble() > 0);
+        Assert.False(string.IsNullOrEmpty(first.GetProperty("snippet").GetString()));
+        Assert.True(doc.RootElement.TryGetProperty("time_ms", out _));
+    }
+
+    [Fact]
+    public async Task Search_uses_expanded_terms()
+    {
+        using var f = new ServerFactory();
+        f.Expander.Terms = ["term7"];
+        var c = await IndexedClient(f);
+        var r = await Search(c, "{\"query\":\"term3\"}");
+        Assert.Contains(r.Results, x => x.DocId == "doc07");
+        Assert.Equal(["term7"], r.ExpandedTerms);
+    }
+
+    [Fact]
+    public async Task Expand_false_skips_expander()
+    {
+        using var f = new ServerFactory();
+        f.Expander.Terms = ["term7"];
+        var c = await IndexedClient(f);
+        var r = await Search(c, "{\"query\":\"term3\",\"expand\":false}");
+        Assert.Equal(0, f.Expander.Calls);
+        Assert.Empty(r.ExpandedTerms);
+        Assert.DoesNotContain(r.Results, x => x.DocId == "doc07");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("?!")]
+    [InlineData("the of")]
+    public async Task Contentless_query_returns_empty_results(string q)
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        var r = await Search(c, JsonSerializer.Serialize(new { query = q }));
+        Assert.Empty(r.Results);
+    }
+
+    [Fact]
+    public async Task Unknown_mode_is_400()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(c, ApiRoutes.Search, "{\"query\":\"alpha\",\"mode\":\"semantic\"}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Missing_query_is_400()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(c, ApiRoutes.Search, "{}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_before_index_is_409()
+    {
+        using var f = new ServerFactory();
+        var r = await Post(f.CreateClient(), ApiRoutes.Search, "{\"query\":\"alpha\"}");
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Contains($"\"error\":\"{ApiRoutes.ErrorIndexNotBuilt}\"", await r.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Too_long_query_is_400()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        var body = JsonSerializer.Serialize(new { query = new string('a', ApiRoutes.MaxQueryLength + 1) });
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(c, ApiRoutes.Search, body)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Doc_endpoint_returns_text_and_404()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        var doc = await c.GetFromJsonAsync<DocResponse>("/api/doc/doc05", ApiRoutes.Json);
+        Assert.Equal("doc05", doc!.DocId);
+        Assert.Contains("term5", doc.Text);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/api/doc/missing.txt")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Searches_during_rebuild_succeed()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        using var stop = new CancellationTokenSource();
+
+        var searchers = Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
+        {
+            var statuses = new List<HttpStatusCode>();
+            do
+            {
+                statuses.Add((await Post(c, ApiRoutes.Search, "{\"query\":\"alpha\"}")).StatusCode);
+            }
+            while (!stop.IsCancellationRequested);
+            return statuses;
+        })).ToList();
+
+        for (var i = 0; i < 2; i++)
+        {
+            Assert.Equal(HttpStatusCode.OK, (await Post(c, ApiRoutes.Index, "{\"threads\":2}")).StatusCode);
+        }
+
+        await stop.CancelAsync();
+        var all = (await Task.WhenAll(searchers).WaitAsync(TimeSpan.FromSeconds(30))).SelectMany(s => s).ToList();
+        Assert.NotEmpty(all);
+        Assert.All(all, s => Assert.Equal(HttpStatusCode.OK, s));
+    }
+}
