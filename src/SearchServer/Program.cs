@@ -11,8 +11,12 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamin
 builder.Services.AddSingleton(options.Ollama);
 builder.Services.AddHttpClient<IOllamaHealth, OllamaClient>(c => c.Timeout = TimeSpan.FromMilliseconds(options.Ollama.TimeoutMs));
 
+builder.Services.AddSingleton<EngineState>();
+builder.Services.AddSingleton<IndexService>();
+
 var app = builder.Build();
 HealthEndpoints.Map(app);
+IndexEndpoints.Map(app);
 app.Run();
 
 public partial class Program;
