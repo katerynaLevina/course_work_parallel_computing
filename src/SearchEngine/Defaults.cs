@@ -42,7 +42,11 @@ public static class Defaults
     public const string OllamaModel = "gemma4:e2b";
 
     public const string OllamaTimeoutMsEnv = "OLLAMA_TIMEOUT_MS";
-    public const int OllamaTimeoutMs = 90000;
+    public const int OllamaTimeoutMs = 30000;
+
+    public const string OllamaNumThreadEnv = "OLLAMA_NUM_THREAD";
+    // Performance cores of the target Mac: efficiency cores stall llama.cpp, which synchronises threads every step.
+    public const int OllamaNumThread = 4;
 
     public const string OllamaTagsPath = "/api/tags";
     public const string OllamaLatestTag = ":latest";

@@ -6,7 +6,7 @@ namespace SearchEngine.Tests;
 public class OllamaClientHealthTests
 {
     private const string Model = "gemma4:e2b";
-    private static readonly OllamaOptions Options = new("http://ollama:11434", Model, 1000);
+    private static readonly OllamaOptions Options = new("http://ollama:11434", Model, 1000, Defaults.OllamaNumThread);
 
     private static Task<bool> IsAvailable(Func<HttpResponseMessage> respond) =>
         new OllamaClient(new HttpClient(new StubHandler(respond)), Options).IsAvailableAsync(CancellationToken.None);

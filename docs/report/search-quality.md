@@ -16,4 +16,4 @@
 | programming language | мови програмування | Outline of computer programming; The C++ Programming Language; Little b (programming language) | Outline of computer programming; Compiler; Computer programming | code, script, syntax, software, compilation, algorithm, development |
 
 Розширення додає синоніми й пов'язані слова та часто підіймає тематично точніші статті (heart disease, jazz musician, ancient roman emperor), але інколи зсуває результат убік (football world cup).
-Пошук без розширення займає 16–2000 мс, з розширенням ~58–88 с (LLM на CPU в Docker).
+Пошук без розширення займає 16–2000 мс, з розширенням близько 1 с (0,9–1,8 с для «ocean») після завантаження моделі; перший запит після старту ≈ 15–20 с. Ollama обмежено продуктивними ядрами (`OLLAMA_NUM_THREAD=4`).

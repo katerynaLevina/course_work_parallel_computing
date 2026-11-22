@@ -12,7 +12,8 @@ public record ServerOptions(string DataDir, string DataGlob, int SearchThreads, 
         new OllamaOptions(
             Env(Defaults.OllamaUrlEnv, Defaults.OllamaUrl),
             Env(Defaults.OllamaModelEnv, Defaults.OllamaModel),
-            int.Parse(Env(Defaults.OllamaTimeoutMsEnv, Defaults.OllamaTimeoutMs.ToString()))));
+            int.Parse(Env(Defaults.OllamaTimeoutMsEnv, Defaults.OllamaTimeoutMs.ToString())),
+            int.Parse(Env(Defaults.OllamaNumThreadEnv, Defaults.OllamaNumThread.ToString()))));
 
     private static string Env(string name, string fallback) =>
         Environment.GetEnvironmentVariable(name) is { Length: > 0 } value ? value : fallback;

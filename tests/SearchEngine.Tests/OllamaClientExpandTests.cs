@@ -8,7 +8,7 @@ public class OllamaClientExpandTests
 {
     private const string Model = "gemma4:e2b";
     private const int ShortTimeoutMs = 50;
-    private static readonly OllamaOptions Options = new("http://ollama:11434", Model, 1000);
+    private static readonly OllamaOptions Options = new("http://ollama:11434", Model, 1000, Defaults.OllamaNumThread);
 
     private static HttpResponseMessage Generated(string response) =>
         new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { response })) };
@@ -41,6 +41,7 @@ public class OllamaClientExpandTests
         var generateOptions = root.GetProperty("options");
         Assert.Equal(0, generateOptions.GetProperty("temperature").GetInt32());
         Assert.Equal(Defaults.OllamaNumPredict, generateOptions.GetProperty("num_predict").GetInt32());
+        Assert.Equal(Defaults.OllamaNumThread, generateOptions.GetProperty("num_thread").GetInt32());
     }
 
     [Fact]

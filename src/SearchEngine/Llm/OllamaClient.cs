@@ -11,7 +11,8 @@ public sealed class OllamaClient(HttpClient http, OllamaOptions options) : IOlla
 
     private sealed record ModelInfo(string Name);
 
-    private sealed record GenerateOptions(double Temperature, [property: JsonPropertyName("num_predict")] int NumPredict);
+    private sealed record GenerateOptions(double Temperature, [property: JsonPropertyName("num_predict")] int NumPredict,
+        [property: JsonPropertyName("num_thread")] int NumThread);
 
     private sealed record GenerateRequest(string Model, string Prompt, bool Stream, string Format, bool Think, GenerateOptions Options);
 
@@ -43,7 +44,7 @@ public sealed class OllamaClient(HttpClient http, OllamaOptions options) : IOlla
         {
             var request = new GenerateRequest(options.Model, Defaults.ExpansionPrompt + query, false,
                 Defaults.OllamaJsonFormat, false,
-                new GenerateOptions(Defaults.OllamaTemperature, Defaults.OllamaNumPredict));
+                new GenerateOptions(Defaults.OllamaTemperature, Defaults.OllamaNumPredict, options.NumThread));
             using var reply = await http.PostAsJsonAsync(options.Url + Defaults.OllamaGeneratePath, request, Json, timeout.Token);
             reply.EnsureSuccessStatusCode();
             var generated = await reply.Content.ReadFromJsonAsync<GenerateResponse>(Json, timeout.Token);
