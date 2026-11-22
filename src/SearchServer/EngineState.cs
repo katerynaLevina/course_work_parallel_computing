@@ -17,6 +17,8 @@ public sealed class EngineState
 
     public void Publish(SearchIndex index) => Volatile.Write(ref _current, index);
 
+    public void Clear() => Volatile.Write(ref _current, null);
+
     public bool TryBeginBuild() => Interlocked.CompareExchange(ref _building, 1, 0) == 0;
 
     public void EndBuild() => Volatile.Write(ref _building, 0);

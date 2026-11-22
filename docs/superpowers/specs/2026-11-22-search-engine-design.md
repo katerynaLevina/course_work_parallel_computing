@@ -160,7 +160,9 @@ model is available. `./data` is mounted read-only at `/data`.
 4. Wait for all, freeze, compute avg doc length, swap the new index into the
    engine with an atomic reference swap (`Volatile.Write`/`Interlocked`).
 - A second `POST /api/index` while one is running → `409 {"error": ...}`.
-- Searches keep using the previous index during a rebuild.
+- The previous index is released when a rebuild starts (old and new do not fit
+  in memory together); searches answer `409 index not built` until the new
+  index is published.
 - Optional extra request fields (defaults keep the fixed contract):
   `lock_mode: "striped"|"global"` (default striped), `segments` (default 256).
 - `threads` default = CPU count; validate 1..256.

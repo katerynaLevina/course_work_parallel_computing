@@ -76,6 +76,23 @@ public class IndexEndpointTests
     }
 
     [Fact]
+    public async Task Old_index_is_released_when_a_rebuild_starts()
+    {
+        using var f = new ServerFactory();
+        var state = f.Services.GetRequiredService<EngineState>();
+        var service = new IndexService(state, f.Services.GetRequiredService<ServerOptions>());
+        await service.BuildAsync(2, LockMode.Striped, 16, default);
+        Assert.NotNull(state.Current);
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.BuildAsync(2, LockMode.Striped, 16, cts.Token));
+
+        Assert.Null(state.Current);
+    }
+
+    [Fact]
     public async Task Missing_data_dir_is_400()
     {
         using var f = new ServerFactory { DataDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()) };

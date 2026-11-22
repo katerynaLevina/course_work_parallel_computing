@@ -15,6 +15,8 @@ public sealed class IndexService(EngineState state, ServerOptions options)
 
         try
         {
+            // The old and the new index do not fit in memory together: release the old one first.
+            state.Clear();
             var index = await IndexBuilder.BuildAsync(
                 new IndexBuildOptions(options.DataDir, options.DataGlob, threads, mode, segments), ct);
             state.Publish(index);

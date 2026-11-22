@@ -131,14 +131,13 @@ public class SearchEndpointTests
     }
 
     [Fact]
-    public async Task Searches_during_rebuild_succeed()
+    public async Task Searches_during_rebuild_are_200_or_409()
     {
         const int MinSearchesDuringBuilds = 50;
         const int MaxBuilds = 50;
         using var f = new ServerFactory();
         var c = await IndexedClient(f);
         var state = f.Services.GetRequiredService<EngineState>();
-        var before = state.Current;
         var completed = 0;
         using var stop = new CancellationTokenSource();
         var firstDone = new CountdownEvent(20);
@@ -171,7 +170,8 @@ public class SearchEndpointTests
         await stop.CancelAsync();
         var all = (await Task.WhenAll(searchers).WaitAsync(TimeSpan.FromSeconds(30))).SelectMany(s => s).ToList();
         Assert.True(duringBuilds >= MinSearchesDuringBuilds, $"only {duringBuilds} searches overlapped builds");
-        Assert.NotSame(before, state.Current);
-        Assert.All(all, s => Assert.Equal(HttpStatusCode.OK, s));
+        Assert.All(all, s => Assert.True(s is HttpStatusCode.OK or HttpStatusCode.Conflict, $"unexpected {s}"));
+        Assert.NotNull(state.Current);
+        Assert.Equal(HttpStatusCode.OK, (await Post(c, ApiRoutes.Search, "{\"query\":\"alpha\"}")).StatusCode);
     }
 }
