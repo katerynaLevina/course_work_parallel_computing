@@ -22,6 +22,15 @@ public static class Defaults
     public const double IndexLoadFactor = 0.75;
     public const int PostingListInitialCapacity = 4;
 
+    public const double Bm25K1 = 1.2;
+    public const double Bm25B = 0.75;
+    public const double OriginalTermWeight = 1.0;
+    public const double ExpandedTermWeight = 0.5;
+    public const int SnippetRadius = 120;
+    public const int DefaultTopK = 10;
+    public const int ScoreDecimals = 4;
+    public const string Ellipsis = "…";
+
     public const string SearchThreadsEnv = "SEARCH_THREADS";
 
     public const string OllamaUrlEnv = "OLLAMA_URL";
