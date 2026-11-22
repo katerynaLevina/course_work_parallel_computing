@@ -8,49 +8,57 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
+  <div class="wallpaper" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
   <main class="stage">
-    <div class="panel" id="panel">
-      <form class="search-bar" id="search-form" autocomplete="off">
-        <svg class="magnifier" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="10.5" cy="10.5" r="6.5"></circle>
-          <line x1="15.5" y1="15.5" x2="21" y2="21"></line>
-        </svg>
-        <input id="search-input" type="search" placeholder="Search documents" aria-label="Search documents"
-               spellcheck="false" autofocus>
-        <kbd class="hint">⌘K</kbd>
-      </form>
+    <div class="spotlight" id="spotlight">
+      <div class="panel" id="panel">
+        <div class="panel-body" id="panel-body">
+          <form class="search-bar" id="search-form" autocomplete="off">
+            <svg class="magnifier" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5"></circle>
+              <line x1="15.5" y1="15.5" x2="21" y2="21"></line>
+            </svg>
+            <input id="search-input" type="search" placeholder="Search documents" aria-label="Search documents"
+                   spellcheck="false" autofocus>
+            <kbd class="hint">⌘K</kbd>
+          </form>
 
-      <div class="pipeline" id="pipeline" hidden>
-        <div class="pills">
-          <span class="pill" id="pill-expand" data-state="pending"><i></i><span>Expanding query</span></span>
-          <span class="pill" id="pill-search" data-state="pending"><i></i><span>Searching</span><b id="search-time"></b></span>
-          <span class="pill" id="pill-done" data-state="pending"><i></i><span>Done</span></span>
+          <div class="pipeline" id="pipeline" hidden>
+            <div class="pills">
+              <span class="pill" id="pill-expand" data-state="pending"><i></i><span>Expanding query</span></span>
+              <span class="pill" id="pill-search" data-state="pending"><i></i><span>Searching</span><b id="search-time"></b></span>
+              <span class="pill" id="pill-done" data-state="pending"><i></i><span>Done</span></span>
+            </div>
+            <div class="chips" id="terms"></div>
+          </div>
+
+          <p class="message" id="message" role="alert" hidden></p>
+
+          <div class="content" id="content" hidden>
+            <ul class="results" id="results" role="listbox" aria-label="Results"></ul>
+            <section class="preview" id="preview" hidden>
+              <div class="preview-body" id="preview-body">
+                <h2 id="preview-title"></h2>
+                <p class="preview-id" id="preview-id"></p>
+                <div class="preview-text" id="preview-text"></div>
+              </div>
+            </section>
+          </div>
+
+          <footer class="footer">
+            <button type="button" class="status-chip" id="status-chip" aria-expanded="false">
+              <span id="doc-count">– documents</span> · Ollama <span class="dot" id="ollama-dot"></span>
+            </button>
+          </footer>
         </div>
-        <div class="chips" id="terms"></div>
       </div>
 
-      <p class="message" id="message" role="alert" hidden></p>
-
-      <div class="content" id="content" hidden>
-        <ul class="results" id="results" role="listbox" aria-label="Results"></ul>
-        <section class="preview" id="preview" hidden>
-          <h2 id="preview-title"></h2>
-          <p class="preview-id" id="preview-id"></p>
-          <div class="preview-text" id="preview-text"></div>
-        </section>
+      <div class="popover" id="index-popover" hidden>
+        <label for="threads">Threads <output id="threads-value">4</output></label>
+        <input type="range" id="threads" min="1" max="16" value="4">
+        <button type="button" class="rebuild" id="rebuild">Rebuild index</button>
+        <p class="rebuild-result" id="rebuild-result"></p>
       </div>
-
-      <footer class="footer">
-        <button type="button" class="status-chip" id="status-chip" aria-expanded="false">
-          <span id="doc-count">– documents</span> · Ollama <span class="dot" id="ollama-dot"></span>
-        </button>
-        <div class="popover" id="index-popover" hidden>
-          <label for="threads">Threads <output id="threads-value">4</output></label>
-          <input type="range" id="threads" min="1" max="16" value="4">
-          <button type="button" class="rebuild" id="rebuild">Rebuild index</button>
-          <p class="rebuild-result" id="rebuild-result"></p>
-        </div>
-      </footer>
     </div>
   </main>
   <script src="app.js"></script>

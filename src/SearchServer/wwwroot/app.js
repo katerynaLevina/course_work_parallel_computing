@@ -8,6 +8,7 @@ const MIN_TERM_LENGTH = 2; // mirrors Defaults.MinTokenLength in src/SearchEngin
 const $ = (id) => document.getElementById(id);
 const input = $("search-input");
 const resultsList = $("results");
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 let socket = null;
 let queue = [];         // messages waiting for the socket to open
@@ -112,6 +113,15 @@ function renderTerms(list, error) {
     chips.push(note);
   }
   $("terms").replaceChildren(...chips);
+  // Each chip flies from the start of the search input to its place in the row, one after another.
+  const from = input.getBoundingClientRect();
+  chips.forEach((chip, i) => {
+    const to = chip.getBoundingClientRect();
+    chip.style.setProperty("--i", i);
+    chip.style.setProperty("--from-x", from.left - to.left + "px");
+    chip.style.setProperty("--from-y", from.top + from.height / 2 - (to.top + to.height / 2) + "px");
+    chip.classList.add("fly");
+  });
 }
 
 function showMessage(text, isError = false) {
@@ -128,20 +138,26 @@ const DOC_ICON = '<svg viewBox="0 0 26 30" aria-hidden="true"><path d="M4 1h12l7
 function renderResults(list) {
   results = list;
   closePreview();
-  resultsList.replaceChildren(...list.map(resultRow));
+  const top = Math.max(0, ...list.map((r) => r.score));
+  resultsList.replaceChildren(...list.map((result, index) => resultRow(result, index, top)));
   $("content").hidden = list.length === 0;
   if (list.length === 0) showMessage("No documents match “" + lastQuery + "”.");
   select(list.length > 0 ? 0 : -1);
 }
 
-function resultRow(result, index) {
+function resultRow(result, index, topScore) {
   const row = document.createElement("li");
   row.className = "result";
   row.setAttribute("role", "option");
+  row.style.setProperty("--i", index); // cascade delay
   row.insertAdjacentHTML("afterbegin", DOC_ICON); // static markup, no server text
+  const score = textElement("span", "result-score", result.score.toFixed(2));
+  const bar = textElement("span", "score-bar", "");
+  bar.style.setProperty("--fill", topScore > 0 ? Math.max(0, result.score) / topScore : 0);
+  score.append(bar);
   row.append(
     textElement("span", "result-title", result.title || result.doc_id),
-    textElement("span", "result-score", result.score.toFixed(2)),
+    score,
     highlight(textElement("span", "result-snippet", ""), result.snippet));
   row.addEventListener("click", () => { select(index); openPreview(); });
   return row;
@@ -186,8 +202,9 @@ function select(index) {
 async function openPreview() {
   const result = results[selected];
   if (!result) return;
+  if (previewId !== null && previewId !== result.doc_id) crossFadePreview();
   previewId = result.doc_id;
-  $("panel").classList.add("split");
+  $("spotlight").classList.add("split");
   $("preview").hidden = false;
   $("preview-title").textContent = result.title || result.doc_id;
   $("preview-id").textContent = result.doc_id;
@@ -207,10 +224,33 @@ async function openPreview() {
   }
 }
 
+/** Leaves a fading copy of the current document on top while the next one fades in. */
+function crossFadePreview() {
+  const preview = $("preview");
+  const body = $("preview-body");
+  if (!reducedMotion.matches) {
+    const ghost = body.cloneNode(true);
+    ghost.removeAttribute("id");
+    ghost.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+    ghost.className = "preview-body ghost";
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.style.top = body.offsetTop - preview.scrollTop + "px";
+    ghost.style.left = body.offsetLeft + "px";
+    ghost.style.width = body.offsetWidth + "px";
+    ghost.addEventListener("animationend", () => ghost.remove());
+    preview.append(ghost);
+  }
+  preview.scrollTop = 0;
+  body.classList.remove("swap");
+  void body.offsetWidth; // restart the fade-in
+  body.classList.add("swap");
+}
+
 function closePreview() {
   previewId = null;
-  $("panel").classList.remove("split");
+  $("spotlight").classList.remove("split");
   $("preview").hidden = true;
+  $("preview").querySelectorAll(".ghost").forEach((ghost) => ghost.remove());
 }
 
 function clearAll() {
@@ -305,7 +345,12 @@ $("status-chip").addEventListener("click", () => togglePopover($("index-popover"
 $("threads").addEventListener("input", (e) => { $("threads-value").textContent = e.target.value; });
 $("rebuild").addEventListener("click", rebuild);
 document.addEventListener("click", (e) => {
-  if (!e.target.closest(".footer")) togglePopover(false);
+  if (!e.target.closest(".footer, .popover")) togglePopover(false);
 });
+
+// The panel animates its height to its content's height (CSS transitions can't reach "auto" everywhere).
+new ResizeObserver(([entry]) => {
+  $("panel").style.height = entry.borderBoxSize[0].blockSize + "px";
+}).observe($("panel-body"));
 
 loadStatus();
