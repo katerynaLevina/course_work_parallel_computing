@@ -10,6 +10,9 @@ public static class Defaults
 
     public const int MinTokenLength = 2;
 
+    public const int WorkerQueueCapacity = 1024;
+    public const string WorkerName = "worker";
+
     public const string SearchThreadsEnv = "SEARCH_THREADS";
 
     public const string OllamaUrlEnv = "OLLAMA_URL";
