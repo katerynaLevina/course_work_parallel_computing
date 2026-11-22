@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/SearchCli/SearchCli.csproj" />
     <Project Path="src/SearchContracts/SearchContracts.csproj" />
     <Project Path="src/SearchEngine/SearchEngine.csproj" />
     <Project Path="src/SearchServer/SearchServer.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/SearchCli.Tests/SearchCli.Tests.csproj" />
     <Project Path="tests/SearchEngine.Tests/SearchEngine.Tests.csproj" />
     <Project Path="tests/SearchServer.Tests/SearchServer.Tests.csproj" />
   </Folder>

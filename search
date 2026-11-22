@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project="$repo/src/SearchCli"
+binary="$project/bin/publish/SearchCli"
+
+stale() {
+  [[ ! -x "$binary" ]] || [[ -n "$(find "$project" -name '*.cs' -not -path '*/obj/*' -not -path '*/bin/*' -newer "$binary" -print -quit)" ]]
+}
+
+if stale; then
+  dotnet publish "$project" -c Release -o "$project/bin/publish" --nologo -v quiet >&2
+fi
+
+exec "$binary" "$@"
