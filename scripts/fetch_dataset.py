@@ -1,6 +1,7 @@
 """Download a slice of English Wikipedia as one .txt file per article."""
 import argparse
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -9,9 +10,12 @@ import requests
 
 SHARD_URL_TEMPLATE = (
     "https://huggingface.co/datasets/wikimedia/wikipedia/resolve/main/"
-    "20231101.en/train-{index:05d}-of-{count:05d}.parquet"
+    "{dataset_date}.en/train-{index:05d}-of-{count:05d}.parquet"
 )
+DATASET_DATE = "20231101"
 SHARD_COUNT = 41
+ITER_BATCH_ROWS = 256
+TEMP_SUFFIX = ".tmp"
 MIN_ARTICLE_CHARS = 500
 FILES_PER_FOLDER = 1000
 DEFAULT_SIZE_GB = 2.0
@@ -25,12 +29,18 @@ COLUMNS = ["id", "title", "text"]
 
 
 def download_shard(index, target):
-    url = SHARD_URL_TEMPLATE.format(index=index, count=SHARD_COUNT)
+    url = SHARD_URL_TEMPLATE.format(dataset_date=DATASET_DATE, index=index, count=SHARD_COUNT)
     with requests.get(url, stream=True, timeout=REQUEST_TIMEOUT_SECONDS) as response:
         response.raise_for_status()
         for chunk in response.iter_content(DOWNLOAD_CHUNK_BYTES):
             target.write(chunk)
     target.flush()
+
+
+def write_atomically(path, content):
+    temp_path = path.with_name(path.name + TEMP_SUFFIX)
+    temp_path.write_text(content, encoding="utf-8")
+    os.replace(temp_path, path)
 
 
 def write_article(out_dir, article_id, title, text):
@@ -40,7 +50,7 @@ def write_article(out_dir, article_id, title, text):
     if path.exists():
         return path.stat().st_size
     folder.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"{title}\n\n{text}", encoding="utf-8")
+    write_atomically(path, f"{title}\n\n{text}")
     return path.stat().st_size
 
 
@@ -49,7 +59,7 @@ def process_shard(index, out_dir, bytes_so_far, target_bytes):
     files = 0
     with tempfile.NamedTemporaryFile(suffix=".parquet") as shard:
         download_shard(index, shard)
-        for batch in pq.ParquetFile(shard.name).iter_batches(columns=COLUMNS):
+        for batch in pq.ParquetFile(shard.name).iter_batches(batch_size=ITER_BATCH_ROWS, columns=COLUMNS):
             for row in batch.to_pylist():
                 if len(row["text"]) < MIN_ARTICLE_CHARS:
                     continue
@@ -78,12 +88,14 @@ def main():
     target_bytes = args.size_gb * BYTES_PER_GB
     bytes_written = progress["bytes"]
     for index in range(progress["shard"], SHARD_COUNT):
+        if bytes_written >= target_bytes:
+            break
         shard_start_bytes = bytes_written
         bytes_written, reached = process_shard(index, out_dir, shard_start_bytes, target_bytes)
         if reached:
             break
         progress = {"shard": index + 1, "bytes": bytes_written}
-        progress_path.write_text(json.dumps(progress))
+        write_atomically(progress_path, json.dumps(progress))
         print(f"shard {index} done, {bytes_written / BYTES_PER_GB:.3f} GB", flush=True)
     print(f"finished: {bytes_written / BYTES_PER_GB:.3f} GB in {out_dir}", flush=True)
 
