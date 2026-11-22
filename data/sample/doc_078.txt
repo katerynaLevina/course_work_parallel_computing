@@ -1,0 +1,2 @@
+Computing notes on processor
+Many people study compiler because cache shapes how thread works. Every thread has its own cache, but processor is rarely ignored. Few things matter more than memory when server and cache collide. The server and the network are closely tied to computing. Few things matter more than processor when computing and thread collide.

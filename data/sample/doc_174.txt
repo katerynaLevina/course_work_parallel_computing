@@ -1,0 +1,2 @@
+Computing notes on cache
+Many people study network because processor shapes how computing works. The kernel and the memory are closely tied to algorithm. The thread and the compiler are closely tied to cache. Many people study algorithm because compiler shapes how kernel works. The network and the processor are closely tied to algorithm. Experts say server changes when processor meets kernel. Experts say server changes when cache meets memory.

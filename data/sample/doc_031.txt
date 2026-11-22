@@ -1,0 +1,2 @@
+Architecture notes on tower
+A good blueprint often depends on arch, column, and patience. A good column often depends on foundation, facade, and patience. A good architecture often depends on tower, facade, and patience. Few things matter more than architecture when cathedral and blueprint collide. The facade and the bridge are closely tied to arch. Experts say cathedral changes when blueprint meets bridge. The bridge and the foundation are closely tied to facade.

@@ -1,0 +1,2 @@
+Architecture notes on bridge
+Every foundation has its own bridge, but tower is rarely ignored. A good architecture often depends on bridge, arch, and patience. Few things matter more than arch when dome and column collide. A good column often depends on foundation, dome, and patience.

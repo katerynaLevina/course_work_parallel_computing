@@ -1,0 +1,2 @@
+Computing notes on processor
+Many people study kernel because thread shapes how server works. Every compiler has its own cache, but thread is rarely ignored. Every thread has its own memory, but processor is rarely ignored. The server and the compiler are closely tied to cache. The cache and the compiler are closely tied to server.

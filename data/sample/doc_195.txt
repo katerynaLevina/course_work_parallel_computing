@@ -1,0 +1,2 @@
+Computing notes on server
+Few things matter more than algorithm when memory and processor collide. The compiler and the kernel are closely tied to memory. A good compiler often depends on cache, algorithm, and patience. Experts say cache changes when computing meets memory. Experts say computing changes when processor meets memory.

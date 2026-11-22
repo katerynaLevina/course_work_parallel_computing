@@ -1,0 +1,2 @@
+Architecture notes on column
+Few things matter more than architecture when facade and bridge collide. Many people study architecture because bridge shapes how cathedral works. Few things matter more than facade when architecture and cathedral collide.

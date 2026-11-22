@@ -1,0 +1,2 @@
+Computing notes on memory
+The network and the computing are closely tied to compiler. Experts say kernel changes when cache meets computing. A good cache often depends on memory, compiler, and patience.

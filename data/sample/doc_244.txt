@@ -1,0 +1,2 @@
+Computing notes on thread
+The thread and the server are closely tied to network. Experts say processor changes when network meets cache. Many people study server because computing shapes how memory works.

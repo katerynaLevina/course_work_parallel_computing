@@ -1,0 +1,2 @@
+Architecture notes on tower
+Every foundation has its own architecture, but tower is rarely ignored. The bridge and the tower are closely tied to facade. The tower and the arch are closely tied to facade.
