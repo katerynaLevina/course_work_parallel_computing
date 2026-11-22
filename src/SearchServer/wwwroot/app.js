@@ -3,15 +3,16 @@
 // Routes and stage names mirror src/SearchContracts/ApiRoutes.cs.
 const ROUTES = { ws: "/ws/search", health: "/api/health", stats: "/api/stats", index: "/api/index", doc: "/api/doc/" };
 const STAGE = { expansion: "query_expansion", keyword: "keyword_search", done: "done", error: "error" };
-const MIN_TERM_LENGTH = 2;
+const MIN_TERM_LENGTH = 2; // mirrors Defaults.MinTokenLength in src/SearchEngine/Defaults.cs
 
 const $ = (id) => document.getElementById(id);
 const input = $("search-input");
 const resultsList = $("results");
 
 let socket = null;
-let queued = null;      // message waiting for the socket to open
-let inFlight = 0;       // searches sent but not finished; only the last one is rendered
+let queue = [];         // messages waiting for the socket to open
+let pending = [];       // ids of sent searches still awaiting done/error; the server answers them in order
+let latest = 0;         // id of the search whose stages are rendered; older or cleared searches are drained silently
 let lastQuery = "";
 let retried = false;
 let results = [];
@@ -19,39 +20,55 @@ let terms = [];
 let selected = -1;
 let previewId = null;
 
+const isRunning = () => pending.includes(latest);
+
 // ---------- WebSocket ----------
 
 function send(message) {
   if (socket && socket.readyState === WebSocket.OPEN) return socket.send(message);
-  queued = message;
-  if (socket) return; // still connecting; onopen sends the queued message
+  queue.push(message);
+  if (socket) return; // still connecting; onopen flushes the queue
   const scheme = location.protocol === "https:" ? "wss:" : "ws:";
   socket = new WebSocket(scheme + "//" + location.host + ROUTES.ws);
-  socket.onopen = () => { socket.send(queued); queued = null; };
-  socket.onmessage = (e) => onStage(JSON.parse(e.data));
+  socket.onopen = () => { queue.forEach((m) => socket.send(m)); queue = []; };
+  socket.onmessage = onMessage;
   socket.onclose = onSocketClose;
 }
 
+function onMessage(e) {
+  try {
+    onStage(JSON.parse(e.data));
+  } catch {
+    console.warn("Ignoring malformed server message.");
+  }
+}
+
 function onSocketClose() {
+  const interrupted = isRunning();
   socket = null;
-  if (inFlight === 0) return;
-  inFlight = 0;
-  if (retried) return showMessage("Connection to the server was lost.", true);
+  queue = [];
+  pending = [];
+  if (!interrupted) return;
+  if (retried) {
+    $("pipeline").hidden = true;
+    return showMessage("Connection to the server was lost.", true);
+  }
   retried = true;
   search(lastQuery); // reconnect once and replay the interrupted search
 }
 
 function search(query) {
   lastQuery = query;
-  inFlight++;
+  latest++;
+  pending.push(latest);
   resetPipeline();
   send(JSON.stringify({ query }));
 }
 
 function onStage({ stage, data }) {
-  const latest = inFlight === 1;
-  if (stage === STAGE.done || stage === STAGE.error) inFlight = Math.max(0, inFlight - 1);
-  if (!latest) return;
+  const current = pending[0];
+  if (stage === STAGE.done || stage === STAGE.error) pending.shift();
+  if (current !== latest) return;
 
   if (stage === STAGE.expansion) {
     terms = data.expanded_terms;
@@ -140,13 +157,13 @@ function textElement(tag, className, text) {
 /** Appends text to el, wrapping query and expanded terms in <mark>; text nodes only. */
 function highlight(el, text) {
   const words = (lastQuery + " " + terms.join(" ")).toLowerCase().split(/[^\p{L}\p{N}]+/u)
-    .filter((w) => w.length >= MIN_TERM_LENGTH)
-    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    .filter((w) => w.length >= MIN_TERM_LENGTH);
   if (words.length === 0) {
     el.append(text);
     return el;
   }
-  text.split(new RegExp("(" + words.join("|") + ")", "giu")).forEach((part, i) => {
+  // Whole words only: a match may not touch a letter or digit on either side.
+  text.split(new RegExp("(?<![\\p{L}\\p{N}])(" + words.join("|") + ")(?![\\p{L}\\p{N}])", "giu")).forEach((part, i) => {
     if (i % 2 === 0) return el.append(part);
     const mark = document.createElement("mark");
     mark.textContent = part;
@@ -197,6 +214,7 @@ function closePreview() {
 }
 
 function clearAll() {
+  latest++; // a search still in flight no longer renders
   input.value = "";
   results = [];
   closePreview();
@@ -217,7 +235,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault(); // keep the search input from clearing itself natively
     if (!$("index-popover").hidden) return togglePopover(false);
     previewId !== null ? closePreview() : clearAll();
-  } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && results.length > 0) {
+  } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && results.length > 0 && e.target.type !== "range") {
     e.preventDefault();
     const step = e.key === "ArrowDown" ? 1 : -1;
     select(Math.min(results.length - 1, Math.max(0, selected + step)));
@@ -231,7 +249,7 @@ function isField(el) {
 $("search-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const query = input.value.trim();
-  if (!query || (query === lastQuery && inFlight > 0)) return;
+  if (!query || (query === lastQuery && isRunning())) return;
   if (query === lastQuery && selected >= 0 && previewId === null) return openPreview();
   retried = false;
   search(query);
