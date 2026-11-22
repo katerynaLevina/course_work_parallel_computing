@@ -45,8 +45,8 @@ public sealed class OllamaClient(HttpClient http, OllamaOptions options) : IOlla
             using var reply = await http.PostAsJsonAsync(options.Url + Defaults.OllamaGeneratePath, request, Json, timeout.Token);
             reply.EnsureSuccessStatusCode();
             var generated = await reply.Content.ReadFromJsonAsync<GenerateResponse>(Json, timeout.Token);
-            var payload = generated is null ? null : JsonSerializer.Deserialize<TermsPayload>(generated.Response, Json);
-            return payload is null
+            var payload = generated?.Response is null ? null : JsonSerializer.Deserialize<TermsPayload>(generated.Response, Json);
+            return payload?.Terms is null
                 ? new ExpansionResult([], Defaults.ExpansionBadResponseError)
                 : new ExpansionResult(Sanitize(payload.Terms, query), null);
         }
@@ -67,7 +67,7 @@ public sealed class OllamaClient(HttpClient http, OllamaOptions options) : IOlla
     private static List<string> Sanitize(IEnumerable<string> terms, string query)
     {
         var own = Tokenizer.Tokenize(query).ToHashSet();
-        return terms.SelectMany(Tokenizer.Tokenize).Distinct().Where(t => !own.Contains(t))
+        return terms.OfType<string>().SelectMany(Tokenizer.Tokenize).Distinct().Where(t => !own.Contains(t))
             .Take(Defaults.MaxExpandedTerms).ToList();
     }
 }

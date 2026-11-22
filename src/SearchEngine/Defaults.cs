@@ -48,8 +48,8 @@ public static class Defaults
     public const string OllamaJsonFormat = "json";
     public const double OllamaTemperature = 0;
     public const int MaxExpandedTerms = 8;
-    public const string ExpansionPrompt =
-        "Return JSON {\"terms\":[...]} with up to 8 single English words that are synonyms or closely related " +
+    public static readonly string ExpansionPrompt =
+        $"Return JSON {{\"terms\":[...]}} with up to {MaxExpandedTerms} single English words that are synonyms or closely related " +
         "search keywords for the query. No explanations. Query: ";
     public const string ExpansionTimeoutError = "expansion timed out";
     public const string ExpansionHttpError = "ollama request failed";

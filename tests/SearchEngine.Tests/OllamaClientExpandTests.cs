@@ -34,7 +34,9 @@ public class OllamaClientExpandTests
         Assert.Equal(Model, root.GetProperty("model").GetString());
         Assert.False(root.GetProperty("stream").GetBoolean());
         Assert.Equal("json", root.GetProperty("format").GetString());
-        Assert.Contains("ocean", root.GetProperty("prompt").GetString());
+        var prompt = root.GetProperty("prompt").GetString();
+        Assert.Contains("ocean", prompt);
+        Assert.Contains(Defaults.MaxExpandedTerms.ToString(), prompt);
         Assert.Equal(0, root.GetProperty("options").GetProperty("temperature").GetInt32());
     }
 
@@ -63,6 +65,29 @@ public class OllamaClientExpandTests
     public async Task Bad_json_returns_empty_with_error()
     {
         var result = await Expand("ocean", "not json");
+
+        Assert.Empty(result.Terms);
+        Assert.NotNull(result.Error);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"terms":null}""")]
+    [InlineData("""{"words":["sea"]}""")]
+    public async Task Wrong_shape_model_reply_returns_empty_with_error(string response)
+    {
+        var result = await Expand("ocean", response);
+
+        Assert.Empty(result.Terms);
+        Assert.NotNull(result.Error);
+    }
+
+    [Theory]
+    [InlineData("""{"response":null}""")]
+    [InlineData("{}")]
+    public async Task Wrong_shape_envelope_returns_empty_with_error(string envelope)
+    {
+        var result = await Expand("ocean", (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(envelope) }));
 
         Assert.Empty(result.Terms);
         Assert.NotNull(result.Error);
