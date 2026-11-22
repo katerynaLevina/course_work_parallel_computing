@@ -1,3 +1,4 @@
+using SearchEngine.Concurrency;
 using SearchEngine.Index;
 
 namespace SearchEngine.Tests;
@@ -43,13 +44,28 @@ public class ConcurrentTermIndexTests
     }
 
     [Fact]
-    public void Freeze_with_pool_matches_sequential_freeze()
+    public void Freeze_with_pool_sorts_out_of_order_postings()
     {
         var sequential = BuildSequential(LockMode.Striped);
-        var parallel = BuildSequential(LockMode.Striped, freeze: false);
-        using (var pool = new SearchEngine.Concurrency.WorkerPool(4))
+        var parallel = new ConcurrentTermIndex(LockMode.Striped);
+
+        // Descending doc ids, so every list is unsorted until Freeze does its work.
+        for (var d = Docs - 1; d >= 0; d--)
         {
-            parallel.Freeze(pool);
+            foreach (var term in TermsOf(d))
+            {
+                parallel.Add(term, d, 1);
+            }
+        }
+
+        using var pool = new WorkerPool(4);
+        parallel.Freeze(pool);
+
+        // Checked while the pool is still alive: Freeze must have waited for every sort task.
+        foreach (var (_, list) in parallel.Entries())
+        {
+            var ids = list.AsSpan().ToArray().Select(p => p.DocId).ToArray();
+            Assert.Equal(ids.Order(), ids);
         }
 
         AssertSameIndex(sequential, parallel);

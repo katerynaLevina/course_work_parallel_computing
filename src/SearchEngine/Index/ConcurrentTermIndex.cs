@@ -32,8 +32,10 @@ public sealed class ConcurrentTermIndex
 
     public int SegmentCount => _segments.Length;
 
+    /// <summary>Valid only after Freeze().</summary>
     public int TermCount => _segments.Sum(s => s.Count);
 
+    /// <summary>Valid only after Freeze().</summary>
     public long PostingCount => Entries().Sum(e => (long)e.List.Count);
 
     public void Add(string term, int docId, int tf)
@@ -78,6 +80,7 @@ public sealed class ConcurrentTermIndex
         Task.WaitAll(_segments.Select(segment => pool.Submit(segment.SortAll)).ToArray());
     }
 
+    /// <summary>Valid only after Freeze(): walks the buckets without locking.</summary>
     public IEnumerable<(string Term, PostingList List)> Entries()
     {
         foreach (var segment in _segments)
@@ -145,7 +148,9 @@ public sealed class ConcurrentTermIndex
             return null;
         }
 
-        // Taking the lock also publishes the sorted arrays to threads that later read lock-free.
+        // Lock-free reads are safe once the frozen index is handed to readers through a synchronizing
+        // handoff (Task completion / WaitAll, then publishing the index reference); the lock here only
+        // keeps the sort from overlapping any straggling Add.
         public void SortAll()
         {
             lock (this)
