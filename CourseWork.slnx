@@ -5,6 +5,9 @@
     <Project Path="src/SearchEngine/SearchEngine.csproj" />
     <Project Path="src/SearchServer/SearchServer.csproj" />
   </Folder>
+  <Folder Name="/bench/">
+    <Project Path="bench/SearchBench/SearchBench.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SearchCli.Tests/SearchCli.Tests.csproj" />
     <Project Path="tests/SearchEngine.Tests/SearchEngine.Tests.csproj" />
