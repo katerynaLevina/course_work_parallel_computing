@@ -62,6 +62,7 @@ function search(query) {
   lastQuery = query;
   latest++;
   pending.push(latest);
+  resetResults(); // the previous search's rows, selection and preview go away; nothing is selected until the user picks a row
   resetPipeline();
   send(JSON.stringify({ query }));
 }
@@ -137,18 +138,17 @@ const DOC_ICON = '<svg viewBox="0 0 26 30" aria-hidden="true"><path d="M4 1h12l7
 
 function renderResults(list) {
   results = list;
-  closePreview();
   const top = Math.max(0, ...list.map((r) => r.score));
   resultsList.replaceChildren(...list.map((result, index) => resultRow(result, index, top)));
   $("content").hidden = list.length === 0;
   if (list.length === 0) showMessage("No documents match “" + lastQuery + "”.");
-  select(list.length > 0 ? 0 : -1);
 }
 
 function resultRow(result, index, topScore) {
   const row = document.createElement("li");
   row.className = "result";
   row.setAttribute("role", "option");
+  row.setAttribute("aria-selected", "false");
   row.style.setProperty("--i", index); // cascade delay
   row.insertAdjacentHTML("afterbegin", DOC_ICON); // static markup, no server text
   const score = textElement("span", "result-score", result.score.toFixed(2));
@@ -253,15 +253,19 @@ function closePreview() {
   $("preview").querySelectorAll(".ghost").forEach((ghost) => ghost.remove());
 }
 
-function clearAll() {
-  latest++; // a search still in flight no longer renders
-  input.value = "";
-  lastQuery = "";
+function resetResults() {
   selected = -1;
   results = [];
   closePreview();
   resultsList.replaceChildren();
   $("content").hidden = true;
+}
+
+function clearAll() {
+  latest++; // a search still in flight no longer renders
+  input.value = "";
+  lastQuery = "";
+  resetResults();
   $("pipeline").hidden = true;
   showMessage("");
 }
