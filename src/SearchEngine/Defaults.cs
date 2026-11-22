@@ -8,6 +8,8 @@ public static class Defaults
     public const string DataGlobEnv = "DATA_GLOB";
     public const string DataGlob = "*.txt";
 
+    public const int MinTokenLength = 2;
+
     public const string SearchThreadsEnv = "SEARCH_THREADS";
 
     public const string OllamaUrlEnv = "OLLAMA_URL";
