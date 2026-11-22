@@ -7,19 +7,15 @@ namespace SearchEngine.Index;
 
 public static class IndexBuilder
 {
-    public static Task<SearchIndex> BuildAsync(IndexBuildOptions o, CancellationToken ct = default)
+    public static async Task<SearchIndex> BuildAsync(IndexBuildOptions o, CancellationToken ct = default)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(o.BatchSize, 1);
         if (!Directory.Exists(o.DataDir))
         {
             throw new DirectoryNotFoundException($"Data directory not found: {o.DataDir}");
         }
 
-        // The whole build is blocking work on our own worker threads, so run it off the caller's thread.
-        return Task.Run(() => Build(o, ct), ct);
-    }
-
-    private static SearchIndex Build(IndexBuildOptions o, CancellationToken ct)
-    {
+        ct.ThrowIfCancellationRequested();
         var clock = Stopwatch.StartNew();
 
         // Sequential: list and sort the files so a document's id (its array position) is the same on every run.
@@ -42,15 +38,15 @@ public static class IndexBuilder
             var end = Math.Min(first + o.BatchSize, files.Count);
             batches.Add(pool.Submit(() =>
             {
+                ct.ThrowIfCancellationRequested();
                 for (var id = start; id < end; id++)
                 {
-                    ct.ThrowIfCancellationRequested();
                     docs[id] = IndexFile(files[id], id, o.DataDir, terms);
                 }
             }));
         }
 
-        Task.WaitAll(batches.ToArray());
+        await Task.WhenAll(batches);
 
         // Parallel again on the same pool: every segment sorts its posting lists independently.
         terms.Freeze(pool);

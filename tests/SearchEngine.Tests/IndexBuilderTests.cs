@@ -123,6 +123,37 @@ public class IndexBuilderTests
         Assert.True(index.BuildTimeMs >= 0);
     }
 
+    [Fact]
+    public async Task Cancelled_token_throws_cancellation()
+    {
+        using var corpus = new TempCorpus();
+        corpus.Write("a.txt", "alpha");
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => IndexBuilder.BuildAsync(new IndexBuildOptions(corpus.Path), cts.Token));
+    }
+
+    [Fact]
+    public async Task Unreadable_file_surfaces_original_exception()
+    {
+        using var corpus = new TempCorpus();
+        corpus.Write("a.txt", "alpha");
+        // A link to a missing file is listed by the enumeration but cannot be read.
+        File.CreateSymbolicLink(Path.Combine(corpus.Path, "broken.txt"), Path.Combine(corpus.Path, "nowhere"));
+
+        await Assert.ThrowsAsync<FileNotFoundException>(() => IndexBuilder.BuildAsync(new IndexBuildOptions(corpus.Path)));
+    }
+
+    [Fact]
+    public async Task Batch_size_below_one_is_rejected()
+    {
+        using var corpus = new TempCorpus();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => IndexBuilder.BuildAsync(new IndexBuildOptions(corpus.Path, BatchSize: 0)));
+    }
+
     private sealed class TempCorpus : IDisposable
     {
         public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N"));
