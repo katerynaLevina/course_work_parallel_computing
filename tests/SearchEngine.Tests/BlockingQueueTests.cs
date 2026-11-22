@@ -41,19 +41,16 @@ public class BlockingQueueTests
         var queue = new BlockingQueue<int>(2);
         const int value = 42;
         var got = 0;
-        var elapsedMs = 0L;
-        var taker = new Thread(() =>
-        {
-            var watch = Stopwatch.StartNew();
-            queue.TryTake(out got);
-            elapsedMs = watch.ElapsedMilliseconds;
-        });
+        var taker = new Thread(() => queue.TryTake(out got));
 
+        // The stopwatch runs on this thread, so a late-starting taker cannot shrink the measurement.
+        var watch = Stopwatch.StartNew();
         taker.Start();
         Thread.Sleep(DelayMs);
         queue.Add(value);
 
         Assert.True(taker.Join(GenerousWaitMs));
+        var elapsedMs = watch.ElapsedMilliseconds;
         Assert.Equal(value, got);
         Assert.True(elapsedMs >= ToleratedDelayMs, $"taker returned after only {elapsedMs} ms");
     }
