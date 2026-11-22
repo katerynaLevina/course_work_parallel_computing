@@ -1,0 +1,46 @@
+@startuml seq-search-rest
+title Keyword search over REST (POST /api/search)
+
+actor Client
+participant "SearchEndpoint" as Api
+participant SearchService
+participant OllamaClient
+participant "Ollama" as Ollama
+participant EngineState
+participant "WorkerPool\n(search)" as Pool
+participant Bm25Searcher
+
+Client -> Api : POST /api/search {query, mode: "keyword", expand, top_k}
+
+opt expand is true
+  Api -> SearchService : ExpandAsync(query, ct)
+  SearchService -> OllamaClient : ExpandAsync(query, ct)
+  OllamaClient -> Ollama : POST /api/generate (format: json)
+  Ollama --> OllamaClient : {"response": "{\"terms\": [...]}"}
+  note right of OllamaClient
+    On timeout or bad output the
+    result is empty terms plus an
+    error string; it never throws.
+  end note
+  OllamaClient --> SearchService : ExpansionResult
+  SearchService --> Api : ExpansionResult
+end
+
+Api -> SearchService : KeywordSearchAsync(query, expanded, topK)
+SearchService -> EngineState : Current
+
+alt no index built
+  EngineState --> SearchService : null
+  SearchService --> Api : IndexNotBuiltException
+  Api --> Client : 409 {"error": "index not built"}
+else index loaded
+  EngineState --> SearchService : SearchIndex
+  SearchService -> Pool : Submit(BM25 search)
+  Pool -> Bm25Searcher : Search(index, original, expanded, topK)
+  Bm25Searcher --> Pool : hits with snippets
+  Pool --> SearchService : hits
+  SearchService --> Api : KeywordResult(hits, time_ms)
+  Api --> Client : 200 {results, time_ms, expanded_terms}
+end
+
+@enduml

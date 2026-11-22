@@ -1,0 +1,46 @@
+@startuml seq-build-index
+title Build index (POST /api/index)
+
+actor Client
+participant "IndexEndpoint" as Api
+participant IndexService
+participant EngineState
+participant IndexBuilder
+participant "WorkerPool\n(build)" as Pool
+participant "Worker thread" as Worker
+participant "ConcurrentTermIndex" as Terms
+
+Client -> Api : POST /api/index {threads, lock_mode, segments}
+Api -> IndexService : BuildAsync(threads, mode, segments)
+IndexService -> EngineState : TryBeginBuild()
+
+alt another build is running
+  EngineState --> IndexService : false
+  IndexService --> Api : BuildInProgressException
+  Api --> Client : 409 {"error": "..."}
+else build starts
+  EngineState --> IndexService : true
+  IndexService -> IndexBuilder : BuildAsync(options)
+  IndexBuilder -> Pool : create(threads)
+
+  loop each batch of files
+    IndexBuilder -> Pool : Submit(batch work)
+    Pool -> Worker : run batch
+    Worker -> Worker : read file, tokenize, count tf
+    loop each term in batch
+      Worker -> Terms : Add(term, docId, tf)
+    end
+  end
+
+  IndexBuilder -> Pool : await all batch tasks
+  IndexBuilder -> Terms : Freeze(pool)
+  Terms -> Pool : Submit(sort one segment) per segment
+  IndexBuilder -> Pool : Dispose()
+  IndexBuilder --> IndexService : SearchIndex
+  IndexService -> EngineState : Publish(index)
+  IndexService -> EngineState : EndBuild()
+  IndexService --> Api : SearchIndex
+  Api --> Client : 200 {documents_indexed, time_ms}
+end
+
+@enduml

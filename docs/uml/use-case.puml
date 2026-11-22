@@ -1,0 +1,46 @@
+@startuml use-case
+title Search engine: use cases
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #F5F5F5
+  BorderColor #555555
+}
+
+actor "User\n(Web UI)" as WebUser
+actor "User\n(CLI)" as CliUser
+actor "Benchmark\nscript" as Bench
+actor "Ollama" as Ollama <<secondary>>
+
+rectangle "Search engine" {
+  usecase "Check health" as UC_Health
+  usecase "Build index" as UC_Build
+  usecase "Search (keyword)" as UC_Search
+  usecase "Stream search pipeline" as UC_Stream
+  usecase "View stats" as UC_Stats
+  usecase "View document" as UC_Doc
+  usecase "Expand query" as UC_Expand
+}
+
+WebUser -- UC_Health
+WebUser -- UC_Stream
+WebUser -- UC_Stats
+WebUser -- UC_Doc
+WebUser -- UC_Build
+
+CliUser -- UC_Health
+CliUser -- UC_Build
+CliUser -- UC_Search
+CliUser -- UC_Stats
+
+Bench -- UC_Build
+Bench -- UC_Search
+
+UC_Search ..> UC_Expand : <<include>>
+UC_Stream ..> UC_Expand : <<include>>
+
+Ollama -- UC_Health
+Ollama -- UC_Expand
+
+@enduml

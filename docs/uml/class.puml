@@ -1,0 +1,194 @@
+@startuml class
+title Search engine: planned classes
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #555555
+}
+
+package "Concurrency" {
+  class "BlockingQueue~T~" as BlockingQueue {
+    +Add(item : T)
+    +TryTake(item : out T) : bool
+    +CompleteAdding()
+    +Count : int
+  }
+
+  class WorkerPool {
+    +ThreadCount : int
+    +Submit(work : Action) : Task
+    +Submit~T~(work : Func~T~) : Task~T~
+    +Dispose()
+  }
+}
+
+package "Index" {
+  enum LockMode {
+    Striped
+    Global
+  }
+
+  class ConcurrentTermIndex {
+    +Add(term : string, docId : int, tf : int)
+    +Get(term : string) : PostingList?
+    +Freeze(pool : WorkerPool?)
+    +TermCount : int
+    +PostingCount : long
+    +Mode : LockMode
+    +SegmentCount : int
+    +Entries() : IEnumerable
+  }
+
+  class PostingList {
+    +Add(docId : int, tf : int)
+    +Count : int
+    +AsSpan() : ReadOnlySpan~Posting~
+    +SortByDocId()
+  }
+
+  class Posting <<record struct>> {
+    +DocId : int
+    +Tf : int
+  }
+
+  class DocInfo <<record>> {
+    +DocId : string
+    +Path : string
+    +Title : string
+    +Length : int
+  }
+
+  class SearchIndex {
+    +Terms : ConcurrentTermIndex
+    +Docs : DocInfo[]
+    +AvgDocLength : double
+    +BuildTimeMs : long
+    +ThreadsUsed : int
+    +FindDoc(docId : string) : DocInfo?
+  }
+
+  class IndexBuildOptions <<record>> {
+    +DataDir : string
+    +Glob : string
+    +Threads : int
+    +Mode : LockMode
+    +Segments : int
+    +BatchSize : int
+  }
+
+  class IndexBuilder <<static>> {
+    +{static} BuildAsync(options : IndexBuildOptions) : Task~SearchIndex~
+  }
+
+  class Tokenizer <<static>> {
+    +{static} Tokenize(text : string) : List~string~
+  }
+}
+
+package "Search" {
+  class SearchHit <<record>> {
+    +DocId : string
+    +Title : string
+    +Score : double
+    +Snippet : string
+  }
+
+  class Bm25Searcher <<static>> {
+    +{static} Search(index : SearchIndex, originalTerms, expandedTerms, topK : int) : IReadOnlyList~SearchHit~
+  }
+
+  class SnippetBuilder <<static>> {
+    +{static} Build(text : string, terms, radius : int) : string
+  }
+
+  class ExpansionResult <<record>> {
+    +Terms : IReadOnlyList~string~
+    +Error : string?
+  }
+
+  interface IQueryExpander {
+    +ExpandAsync(query : string, ct : CancellationToken) : Task~ExpansionResult~
+  }
+
+  interface IOllamaHealth {
+    +IsAvailableAsync(ct : CancellationToken) : Task~bool~
+  }
+
+  class OllamaClient {
+    +IsAvailableAsync(ct : CancellationToken) : Task~bool~
+    +ExpandAsync(query : string, ct : CancellationToken) : Task~ExpansionResult~
+  }
+
+  class OllamaOptions <<record>> {
+    +Url : string
+    +Model : string
+    +TimeoutMs : int
+  }
+}
+
+package "Server" {
+  class EngineState {
+    +Current : SearchIndex?
+    +Publish(index : SearchIndex)
+    +TryBeginBuild() : bool
+    +EndBuild()
+  }
+
+  class IndexService {
+    +BuildAsync(threads : int, mode : LockMode, segments : int, ct : CancellationToken) : Task~SearchIndex~
+  }
+
+  class SearchService {
+    +ExpandAsync(query : string, ct : CancellationToken) : Task~ExpansionResult~
+    +KeywordSearchAsync(query : string, expanded, topK : int) : Task~KeywordResult~
+  }
+
+  class ServerOptions <<record>> {
+    +DataDir : string
+    +DataGlob : string
+    +SearchThreads : int
+    +Ollama : OllamaOptions
+    +{static} FromEnvironment() : ServerOptions
+  }
+}
+
+' Concurrency
+WorkerPool ..> BlockingQueue : uses
+
+' Index
+ConcurrentTermIndex *-- "many" PostingList : holds
+ConcurrentTermIndex --> LockMode : Mode
+ConcurrentTermIndex ..> WorkerPool : Freeze(pool)
+PostingList ..> Posting
+SearchIndex *-- ConcurrentTermIndex : Terms
+SearchIndex *-- "many" DocInfo : Docs
+IndexBuilder ..> IndexBuildOptions
+IndexBuilder ..> WorkerPool : builds on
+IndexBuilder ..> ConcurrentTermIndex : fills
+IndexBuilder ..> Tokenizer : tokenizes with
+IndexBuilder ..> SearchIndex : creates
+
+' Search
+Bm25Searcher ..> SearchIndex : reads
+Bm25Searcher ..> SearchHit : returns
+Bm25Searcher ..> SnippetBuilder : snippets
+OllamaClient ..|> IOllamaHealth
+OllamaClient ..|> IQueryExpander
+OllamaClient --> OllamaOptions
+
+' Server
+EngineState o-- SearchIndex : Current
+IndexService --> EngineState
+IndexService ..> IndexBuilder
+IndexService --> ServerOptions
+SearchService --> EngineState
+SearchService --> IQueryExpander
+SearchService --> WorkerPool : search pool
+SearchService ..> Bm25Searcher
+SearchService ..> ExpansionResult
+ServerOptions *-- OllamaOptions
+
+@enduml

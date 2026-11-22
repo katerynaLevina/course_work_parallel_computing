@@ -1,0 +1,35 @@
+@startuml seq-search-ws
+title Streamed search pipeline (WebSocket /ws/search)
+
+actor "Web UI" as Ui
+participant "WsEndpoint" as Ws
+participant SearchService
+participant OllamaClient
+participant "WorkerPool\n(search)" as Pool
+
+Ui -> Ws : connect /ws/search
+
+loop until close frame or socket error
+  Ui -> Ws : {"query": "..."}
+
+  Ws -> SearchService : ExpandAsync(query, ct)
+  SearchService -> OllamaClient : ExpandAsync(query, ct)
+  OllamaClient --> SearchService : ExpansionResult
+  SearchService --> Ws : ExpansionResult
+  Ws -> Ui : {"stage": "query_expansion", "data": {original, expanded_terms, error?}}
+
+  Ws -> SearchService : KeywordSearchAsync(query, expanded, topK)
+  SearchService -> Pool : Submit(BM25 search)
+  Pool --> SearchService : KeywordResult
+  SearchService --> Ws : KeywordResult
+  Ws -> Ui : {"stage": "keyword_search", "data": {results, time_ms}}
+  Ws -> Ui : {"stage": "done"}
+
+  alt pipeline failed
+    Ws -> Ui : {"stage": "error", "data": {"message": "..."}}
+  end
+end
+
+Ui -> Ws : close frame
+
+@enduml
