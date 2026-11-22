@@ -152,6 +152,7 @@ public class WebSocketTests
         {
             await ws.ConnectAsync(uri, cts.Token);
             await Send(ws, "{\"query\":\"term3\"}", cts.Token);
+            await f.Expander.Started.Task.WaitAsync(cts.Token);
             ws.Abort();
         }
 
