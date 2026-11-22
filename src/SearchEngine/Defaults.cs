@@ -13,6 +13,12 @@ public static class Defaults
     public const int WorkerQueueCapacity = 1024;
     public const string WorkerName = "worker";
 
+    public const int IndexSegments = 256;
+    public const int SegmentInitialBuckets = 16;
+    public const int SegmentHashShift = 16;
+    public const double IndexLoadFactor = 0.75;
+    public const int PostingListInitialCapacity = 4;
+
     public const string SearchThreadsEnv = "SEARCH_THREADS";
 
     public const string OllamaUrlEnv = "OLLAMA_URL";
