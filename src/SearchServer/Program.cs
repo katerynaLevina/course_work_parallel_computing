@@ -21,6 +21,8 @@ builder.Services.AddSingleton<SearchService>();
 builder.Services.AddSingleton<IndexService>();
 
 var app = builder.Build();
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseWebSockets();
 HealthEndpoints.Map(app);
 IndexEndpoints.Map(app);
