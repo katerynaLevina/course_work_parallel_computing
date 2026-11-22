@@ -201,6 +201,22 @@ model is available. `./data` is mounted read-only at `/data`.
 
 JSON uses snake_case.
 
+**What is fixed by the spec vs ours.** Fixed by the PDF (must match
+exactly, locked by contract tests): the four REST endpoints and their
+request/response fields above; the WebSocket path `/ws/search`, its request
+`{"query"}`, and the stage messages `query_expansion` (with `original`,
+`expanded_terms`), `keyword_search` (with `results`, `time_ms`) and `done`;
+the CLI call form `./search "запит"`. Ours (our call): all extra fields, the
+`error` stage, `/api/doc`, and the error status codes (409/400). LLM
+expansion is visible to a checker through the `query_expansion` WebSocket
+stage, and through the extra `expanded_terms` field in REST.
+
+**Checker timing (our call).** The spec defines `POST /api/index` as returning
+`documents_indexed` and `time_ms`, so it stays synchronous (returns when the
+build finishes). `/api/health` must be 200 right after `docker compose up`,
+so it does not wait for the model download; README tells the user to wait for
+`ollama-pull` to finish (or check `ollama: true`) before testing expansion.
+
 ### 6.7 WebSocket `/ws/search`
 - Client sends `{"query":"..."}` (optional `top_k`); may send several queries
   sequentially on one connection.
@@ -245,7 +261,11 @@ JSON uses snake_case.
   `--size-gb` (default 2.0).
 - `data/` is git-ignored except `data/sample/` — a few hundred small
   committed documents so `docker compose up` + `POST /api/index` work out of
-  the box. `DATA_DIR` env (default `/data`) — indexes everything under it.
+  the box. `DATA_DIR` env (default `/data`) — indexes everything under it,
+  recursively. File pattern `DATA_GLOB` (default `*.txt`, our call) so a
+  differently shaped teacher corpus can be indexed without code changes.
+  `doc_id` = relative path without extension; `/api/doc/{**doc_id}` uses a
+  catch-all route so ids with slashes work.
 
 ## 7. Benchmarks & report material
 - `bench/SearchBench` (.NET console) against a running server:
@@ -260,6 +280,8 @@ JSON uses snake_case.
   vs clients, latency vs clients.
 - `docs/report/search-quality.md`: table of ~10 test queries
   (query, expected, actual top results).
+- README gets a "Benchmarks" section embedding the charts and a short results
+  table (our call; the spec names no required paths for these).
 - Bottleneck notes: disk I/O vs CPU, lock contention (global vs striped),
   Amdahl (sequential enumeration/freeze), LLM latency in the pipeline.
 
