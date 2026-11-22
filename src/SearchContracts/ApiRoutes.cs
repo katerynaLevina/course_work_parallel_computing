@@ -12,7 +12,11 @@ public static class ApiRoutes
 
     public const string Search = "/api/search";
 
-    public const string Doc = "/api/doc/{**docId}";
+    public const string DocPrefix = "/api/doc/";
+
+    public const string Doc = DocPrefix + "{**docId}";
+
+    public const bool DefaultExpand = true;
 
     public const string HealthStatusOk = "ok";
 

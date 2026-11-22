@@ -1,6 +1,6 @@
+using System.Diagnostics;
 using SearchContracts;
 using SearchEngine;
-using SearchEngine.Text;
 
 namespace SearchServer.Endpoints;
 
@@ -30,18 +30,14 @@ public static class SearchEndpoints
         }
 
         var topK = Math.Clamp(request.TopK ?? Defaults.DefaultTopK, ApiRoutes.MinTopK, ApiRoutes.MaxTopK);
-        var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        var started = Stopwatch.GetTimestamp();
         try
         {
-            IReadOnlyList<string> expanded = [];
-            if ((request.Expand ?? true) && Tokenizer.Tokenize(query).Count > 0)
-            {
-                expanded = (await service.ExpandAsync(query, ct)).Terms;
-            }
+            var expanded = (request.Expand ?? ApiRoutes.DefaultExpand) ? (await service.ExpandAsync(query, ct)).Terms : [];
 
             var result = await service.KeywordSearchAsync(query, expanded, topK);
             var results = result.Hits.Select(h => new SearchResultDto(h.DocId, h.Score, h.Snippet, h.Title)).ToList();
-            return Results.Ok(new SearchResponse(results, (long)System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds, expanded));
+            return Results.Ok(new SearchResponse(results, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds, expanded));
         }
         catch (IndexNotBuiltException e)
         {

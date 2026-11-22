@@ -31,6 +31,8 @@ public static class Defaults
     public const int ScoreDecimals = 4;
     public const string Ellipsis = "…";
 
+    public const string SearchPoolKey = "search";
+
     public const string SearchThreadsEnv = "SEARCH_THREADS";
 
     public const string OllamaUrlEnv = "OLLAMA_URL";

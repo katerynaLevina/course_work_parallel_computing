@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using SearchContracts;
 
 namespace SearchServer.Tests;
@@ -114,18 +115,33 @@ public class SearchEndpointTests
     {
         using var f = new ServerFactory();
         var c = await IndexedClient(f);
-        var doc = await c.GetFromJsonAsync<DocResponse>("/api/doc/doc05", ApiRoutes.Json);
+        var doc = await c.GetFromJsonAsync<DocResponse>(ApiRoutes.DocPrefix + "doc05", ApiRoutes.Json);
         Assert.Equal("doc05", doc!.DocId);
         Assert.Contains("term5", doc.Text);
-        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync("/api/doc/missing.txt")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync(ApiRoutes.DocPrefix + "missing")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_before_index_does_not_call_expander()
+    {
+        using var f = new ServerFactory();
+        var r = await Post(f.CreateClient(), ApiRoutes.Search, "{\"query\":\"alpha\"}");
+        Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
+        Assert.Equal(0, f.Expander.Calls);
     }
 
     [Fact]
     public async Task Searches_during_rebuild_succeed()
     {
+        const int MinSearchesDuringBuilds = 50;
+        const int MaxBuilds = 50;
         using var f = new ServerFactory();
         var c = await IndexedClient(f);
+        var state = f.Services.GetRequiredService<EngineState>();
+        var before = state.Current;
+        var completed = 0;
         using var stop = new CancellationTokenSource();
+        var firstDone = new CountdownEvent(20);
 
         var searchers = Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
         {
@@ -133,19 +149,29 @@ public class SearchEndpointTests
             do
             {
                 statuses.Add((await Post(c, ApiRoutes.Search, "{\"query\":\"alpha\"}")).StatusCode);
+                Interlocked.Increment(ref completed);
+                if (statuses.Count == 1)
+                {
+                    firstDone.Signal();
+                }
             }
             while (!stop.IsCancellationRequested);
             return statuses;
         })).ToList();
 
-        for (var i = 0; i < 2; i++)
+        Assert.True(firstDone.Wait(TimeSpan.FromSeconds(30)));
+        var duringBuilds = 0;
+        for (var i = 0; i < MaxBuilds && duringBuilds < MinSearchesDuringBuilds; i++)
         {
+            var start = Volatile.Read(ref completed);
             Assert.Equal(HttpStatusCode.OK, (await Post(c, ApiRoutes.Index, "{\"threads\":2}")).StatusCode);
+            duringBuilds += Volatile.Read(ref completed) - start;
         }
 
         await stop.CancelAsync();
         var all = (await Task.WhenAll(searchers).WaitAsync(TimeSpan.FromSeconds(30))).SelectMany(s => s).ToList();
-        Assert.NotEmpty(all);
+        Assert.True(duringBuilds >= MinSearchesDuringBuilds, $"only {duringBuilds} searches overlapped builds");
+        Assert.NotSame(before, state.Current);
         Assert.All(all, s => Assert.Equal(HttpStatusCode.OK, s));
     }
 }
