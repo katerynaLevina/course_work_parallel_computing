@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using SearchEngine.Text;
 
 namespace SearchEngine.Llm;
@@ -10,9 +11,9 @@ public sealed class OllamaClient(HttpClient http, OllamaOptions options) : IOlla
 
     private sealed record ModelInfo(string Name);
 
-    private sealed record GenerateOptions(double Temperature);
+    private sealed record GenerateOptions(double Temperature, [property: JsonPropertyName("num_predict")] int NumPredict);
 
-    private sealed record GenerateRequest(string Model, string Prompt, bool Stream, string Format, GenerateOptions Options);
+    private sealed record GenerateRequest(string Model, string Prompt, bool Stream, string Format, bool Think, GenerateOptions Options);
 
     private sealed record GenerateResponse(string Response);
 
@@ -41,7 +42,8 @@ public sealed class OllamaClient(HttpClient http, OllamaOptions options) : IOlla
         try
         {
             var request = new GenerateRequest(options.Model, Defaults.ExpansionPrompt + query, false,
-                Defaults.OllamaJsonFormat, new GenerateOptions(Defaults.OllamaTemperature));
+                Defaults.OllamaJsonFormat, false,
+                new GenerateOptions(Defaults.OllamaTemperature, Defaults.OllamaNumPredict));
             using var reply = await http.PostAsJsonAsync(options.Url + Defaults.OllamaGeneratePath, request, Json, timeout.Token);
             reply.EnsureSuccessStatusCode();
             var generated = await reply.Content.ReadFromJsonAsync<GenerateResponse>(Json, timeout.Token);

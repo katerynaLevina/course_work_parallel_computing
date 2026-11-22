@@ -37,7 +37,10 @@ public class OllamaClientExpandTests
         var prompt = root.GetProperty("prompt").GetString();
         Assert.Contains("ocean", prompt);
         Assert.Contains(Defaults.MaxExpandedTerms.ToString(), prompt);
-        Assert.Equal(0, root.GetProperty("options").GetProperty("temperature").GetInt32());
+        Assert.False(root.GetProperty("think").GetBoolean());
+        var generateOptions = root.GetProperty("options");
+        Assert.Equal(0, generateOptions.GetProperty("temperature").GetInt32());
+        Assert.Equal(Defaults.OllamaNumPredict, generateOptions.GetProperty("num_predict").GetInt32());
     }
 
     [Fact]

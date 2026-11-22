@@ -42,13 +42,14 @@ public static class Defaults
     public const string OllamaModel = "gemma4:e2b";
 
     public const string OllamaTimeoutMsEnv = "OLLAMA_TIMEOUT_MS";
-    public const int OllamaTimeoutMs = 20000;
+    public const int OllamaTimeoutMs = 90000;
 
     public const string OllamaTagsPath = "/api/tags";
     public const string OllamaLatestTag = ":latest";
     public const string OllamaGeneratePath = "/api/generate";
     public const string OllamaJsonFormat = "json";
     public const double OllamaTemperature = 0;
+    public const int OllamaNumPredict = 64;
     public const int MaxExpandedTerms = 8;
     public static readonly string ExpansionPrompt =
         $"Return JSON {{\"terms\":[...]}} with up to {MaxExpandedTerms} single English words that are synonyms or closely related " +
