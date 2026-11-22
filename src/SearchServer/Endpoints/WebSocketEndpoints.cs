@@ -21,9 +21,9 @@ public static class WebSocketEndpoints
         var ct = context.RequestAborted;
         try
         {
-            while (await ReceiveTextAsync(socket, ct) is { } text)
+            while (await ReceiveTextAsync(socket, ct) is { } received)
             {
-                await RunPipelineAsync(socket, service, text, ct);
+                await RunPipelineAsync(socket, service, received.Text, ct);
             }
         }
         catch (Exception e) when (e is WebSocketException or OperationCanceledException)
@@ -32,8 +32,11 @@ public static class WebSocketEndpoints
         }
     }
 
-    /// <summary>Assembles one text message from its fragments; null when the client closed. An oversized message yields an empty string.</summary>
-    private static async Task<string?> ReceiveTextAsync(WebSocket socket, CancellationToken ct)
+    /// <summary>A received message; Text is null when it exceeded the size limit.</summary>
+    private sealed record Received(string? Text);
+
+    /// <summary>Assembles one text message from its fragments; null when the client closed.</summary>
+    private static async Task<Received?> ReceiveTextAsync(WebSocket socket, CancellationToken ct)
     {
         var buffer = new byte[ApiRoutes.WsReceiveBufferBytes];
         using var message = new MemoryStream();
@@ -56,12 +59,12 @@ public static class WebSocketEndpoints
         }
         while (!result.EndOfMessage);
 
-        return tooLarge ? string.Empty : Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length);
+        return new Received(tooLarge ? null : Encoding.UTF8.GetString(message.GetBuffer(), 0, (int)message.Length));
     }
 
-    private static async Task RunPipelineAsync(WebSocket socket, SearchService service, string text, CancellationToken ct)
+    private static async Task RunPipelineAsync(WebSocket socket, SearchService service, string? text, CancellationToken ct)
     {
-        if (text.Length == 0)
+        if (text is null)
         {
             await SendErrorAsync(socket, ApiRoutes.ErrorMessageTooLarge, ct);
             return;
@@ -78,25 +81,20 @@ public static class WebSocketEndpoints
             return;
         }
 
-        if (request?.Query is not { } query)
+        if (SearchRequestRules.ValidateQuery(request?.Query) is { } queryError)
         {
-            await SendErrorAsync(socket, ApiRoutes.ErrorQueryRequired, ct);
+            await SendErrorAsync(socket, queryError, ct);
             return;
         }
 
-        if (query.Length > ApiRoutes.MaxQueryLength)
-        {
-            await SendErrorAsync(socket, ApiRoutes.ErrorQueryTooLong, ct);
-            return;
-        }
-
+        var query = request!.Query!;
         try
         {
             var expansion = await service.ExpandAsync(query, ct);
             await SendAsync(socket, new StageMessage(ApiRoutes.StageQueryExpansion, new ExpansionStageData(query, expansion.Terms, expansion.Error)), ct);
 
-            var keyword = await service.KeywordSearchAsync(query, expansion.Terms, SearchEndpoints.ClampTopK(request.TopK));
-            var results = keyword.Hits.Select(SearchEndpoints.ToDto).ToList();
+            var keyword = await service.KeywordSearchAsync(query, expansion.Terms, SearchRequestRules.ClampTopK(request.TopK));
+            var results = keyword.Hits.Select(SearchRequestRules.ToDto).ToList();
             await SendAsync(socket, new StageMessage(ApiRoutes.StageKeywordSearch, new KeywordStageData(results, keyword.TimeMs)), ct);
 
             await SendAsync(socket, new StageMessage(ApiRoutes.StageDone, null), ct);

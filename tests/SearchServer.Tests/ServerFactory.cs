@@ -19,6 +19,9 @@ public sealed class FakeExpander : IQueryExpander
 
     public TimeSpan Delay { get; set; }
 
+    /// <summary>Completed when a delayed expansion is cancelled.</summary>
+    public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public int Calls => Volatile.Read(ref _calls);
 
     public async Task<ExpansionResult> ExpandAsync(string query, CancellationToken ct)
@@ -26,7 +29,15 @@ public sealed class FakeExpander : IQueryExpander
         Interlocked.Increment(ref _calls);
         if (Delay > TimeSpan.Zero)
         {
-            await Task.Delay(Delay, ct);
+            try
+            {
+                await Task.Delay(Delay, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled.TrySetResult();
+                throw;
+            }
         }
 
         return new ExpansionResult(Terms, null);

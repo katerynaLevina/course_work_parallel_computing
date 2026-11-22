@@ -127,21 +127,39 @@ public class WebSocketTests
     }
 
     [Fact]
-    public async Task Client_abort_mid_pipeline_does_not_break_server()
+    public async Task Empty_message_yields_invalid_json_error_not_too_large()
     {
         using var cts = new CancellationTokenSource(Timeout);
         using var f = new ServerFactory();
         await Index(f);
-        f.Expander.Delay = TimeSpan.FromMilliseconds(500);
-        var ws = await Connect(f, cts.Token);
-        await Send(ws, "{\"query\":\"term3\"}", cts.Token);
-        ws.Abort();
-        ws.Dispose();
-        await Task.Delay(TimeSpan.FromMilliseconds(800), cts.Token);
+        using var ws = await Connect(f, cts.Token);
+        await Send(ws, string.Empty, cts.Token);
+        Assert.Equal(ApiRoutes.ErrorInvalidJson, (await Receive(ws, cts.Token)).GetProperty("data").GetProperty("message").GetString());
+    }
 
+    [Fact]
+    public async Task Client_abort_mid_pipeline_cancels_the_expansion_and_does_not_break_server()
+    {
+        using var cts = new CancellationTokenSource(Timeout);
+        using var f = new ServerFactory();
+        f.UseKestrel(0); // the in-memory test server never raises RequestAborted, so use real sockets
+        f.StartServer();
+        await Index(f);
+        f.Expander.Delay = TimeSpan.FromSeconds(5);
+        var uri = new UriBuilder(f.ClientOptions.BaseAddress) { Scheme = "ws", Path = ApiRoutes.WsSearch }.Uri;
+
+        using (var ws = new ClientWebSocket())
+        {
+            await ws.ConnectAsync(uri, cts.Token);
+            await Send(ws, "{\"query\":\"term3\"}", cts.Token);
+            ws.Abort();
+        }
+
+        await f.Expander.Cancelled.Task.WaitAsync(cts.Token);
         Assert.Equal(HttpStatusCode.OK, (await f.CreateClient().GetAsync(ApiRoutes.Health, cts.Token)).StatusCode);
         f.Expander.Delay = TimeSpan.Zero;
-        using var again = await Connect(f, cts.Token);
+        using var again = new ClientWebSocket();
+        await again.ConnectAsync(uri, cts.Token);
         Assert.Equal(ApiRoutes.StageDone, (await Query(again, "term3", cts.Token))[^1].GetProperty("stage").GetString());
     }
 }
