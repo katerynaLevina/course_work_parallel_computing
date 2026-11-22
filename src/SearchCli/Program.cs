@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using System.Text.Json;
 using SearchCli;
 
 CliOptions options;
@@ -41,7 +42,7 @@ try
         case CliDefaults.CommandHealth:
             var health = await client.HealthAsync(default);
             Console.WriteLine($"Status: {health.Status}");
-            Console.WriteLine($"Ollama: {(health.Ollama ? "available" : "unavailable")}");
+            Console.WriteLine($"Ollama: {(health.Ollama ? CliDefaults.OllamaAvailable : CliDefaults.OllamaUnavailable)}");
             break;
         case CliDefaults.CommandSearch when options.Rest || !options.Expand:
             var response = await client.SearchAsync(options.Query!, options.TopK, options.Expand, default);
@@ -59,9 +60,15 @@ try
 
     return CliDefaults.ExitOk;
 }
-catch (Exception e) when (e is HttpRequestException or WebSocketException)
+catch (Exception e) when (e is HttpRequestException or WebSocketException or TaskCanceledException or JsonException or InvalidOperationException)
 {
-    var unreachable = e is WebSocketException || e.InnerException is System.Net.Sockets.SocketException;
-    Console.Error.WriteLine(unreachable ? $"server not reachable at {options.Server}" : e.Message);
+    Console.Error.WriteLine(e switch
+    {
+        WebSocketException or HttpRequestException { InnerException: System.Net.Sockets.SocketException } =>
+            string.Format(CliDefaults.MessageUnreachable, options.Server),
+        TaskCanceledException => CliDefaults.MessageTimeout,
+        JsonException or InvalidOperationException => CliDefaults.MessageBadResponse,
+        _ => e.Message,
+    });
     return CliDefaults.ExitServerError;
 }

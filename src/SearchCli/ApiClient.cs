@@ -7,8 +7,7 @@ namespace SearchCli;
 
 public sealed class ApiClient(string server) : IDisposable
 {
-    private readonly Uri baseUri = new(server);
-    private readonly HttpClient http = new() { BaseAddress = new Uri(server) };
+    private readonly HttpClient http = new() { BaseAddress = new Uri(server), Timeout = CliDefaults.HttpTimeout };
 
     public Task<SearchResponse> SearchAsync(string query, int topK, bool expand, CancellationToken ct) =>
         PostAsync<SearchResponse>(ApiRoutes.Search, new SearchRequest(query, ApiRoutes.SearchModeKeyword, expand, topK), ct);
@@ -24,7 +23,7 @@ public sealed class ApiClient(string server) : IDisposable
     public async Task StreamSearchAsync(string query, int topK, ConsoleRenderer renderer, CancellationToken ct)
     {
         using var socket = new ClientWebSocket();
-        var wsUri = new UriBuilder(baseUri) { Scheme = baseUri.Scheme == Uri.UriSchemeHttps ? "wss" : "ws", Path = ApiRoutes.WsSearch };
+        var wsUri = new UriBuilder(http.BaseAddress!) { Scheme = http.BaseAddress!.Scheme == Uri.UriSchemeHttps ? Uri.UriSchemeWss : Uri.UriSchemeWs, Path = ApiRoutes.WsSearch };
         await socket.ConnectAsync(wsUri.Uri, ct);
 
         var request = JsonSerializer.SerializeToUtf8Bytes(new WsRequest(query, topK), ApiRoutes.Json);
@@ -79,14 +78,31 @@ public sealed class ApiClient(string server) : IDisposable
     private async Task<T> PostAsync<T>(string route, object body, CancellationToken ct) =>
         await ReadAsync<T>(await http.PostAsJsonAsync(route, body, ApiRoutes.Json, ct), ct);
 
+    /// <summary>The server's error text, or a generic status message when the body is not an error JSON object.</summary>
+    public static async Task<string> ErrorMessageAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        try
+        {
+            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(ApiRoutes.Json, ct);
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return string.Format(CliDefaults.MessageStatus, (int)response.StatusCode);
+    }
+
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response, CancellationToken ct)
     {
         using (response)
         {
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>(ApiRoutes.Json, ct);
-                throw new HttpRequestException(error?.Error ?? $"server returned {(int)response.StatusCode}");
+                throw new HttpRequestException(await ErrorMessageAsync(response, ct));
             }
 
             return (await response.Content.ReadFromJsonAsync<T>(ApiRoutes.Json, ct))!;

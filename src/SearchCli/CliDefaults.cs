@@ -20,6 +20,41 @@ public static class CliDefaults
 
     public const string CommandHelp = "help";
 
+    public const string FlagRest = "--rest";
+
+    public const string FlagNoExpand = "--no-expand";
+
+    public const string FlagTop = "--top";
+
+    public const string FlagServer = "--server";
+
+    public const string FlagIndex = "--index";
+
+    public const string FlagStats = "--stats";
+
+    public const string FlagHealth = "--health";
+
+    public const string FlagHelp = "--help";
+
+    public const string FlagPrefix = "--";
+
+    public const string ScoreFormat = "F4";
+
+    public const string OllamaAvailable = "available";
+
+    public const string OllamaUnavailable = "unavailable";
+
+    /// <summary>Above the server's default Ollama timeout (20 s) so a slow expansion is not cut off by the client.</summary>
+    public static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(60);
+
+    public const string MessageUnreachable = "server not reachable at {0}";
+
+    public const string MessageTimeout = "server did not respond in time";
+
+    public const string MessageBadResponse = "unexpected response from server";
+
+    public const string MessageStatus = "server returned {0}";
+
     public const int ExitOk = 0;
 
     public const int ExitServerError = 1;

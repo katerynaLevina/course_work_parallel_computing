@@ -39,4 +39,18 @@ public class CliOptionsTests
     {
         Assert.Throws<ArgumentException>(() => CliOptions.Parse([]));
     }
+
+    [Fact]
+    public void Multiple_words_form_one_query()
+    {
+        Assert.Equal("ocean waves", CliOptions.Parse(["ocean", "waves"]).Query);
+    }
+
+    [Theory]
+    [InlineData("not a url")]
+    [InlineData("ftp://host")]
+    public void Bad_server_is_usage_error(string server)
+    {
+        Assert.Throws<ArgumentException>(() => CliOptions.Parse([CliDefaults.FlagServer, server, "q"]));
+    }
 }

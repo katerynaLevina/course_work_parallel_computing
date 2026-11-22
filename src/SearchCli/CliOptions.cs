@@ -7,7 +7,7 @@ public record CliOptions(string Command, string? Query, bool Rest, bool Expand, 
     public static CliOptions Parse(string[] args)
     {
         var command = CliDefaults.CommandSearch;
-        string? query = null;
+        var words = new List<string>();
         var rest = false;
         var expand = ApiRoutes.DefaultExpand;
         var topK = CliDefaults.DefaultTopK;
@@ -18,42 +18,48 @@ public record CliOptions(string Command, string? Query, bool Rest, bool Expand, 
         {
             switch (args[i])
             {
-                case "--rest":
+                case CliDefaults.FlagRest:
                     rest = true;
                     break;
-                case "--no-expand":
+                case CliDefaults.FlagNoExpand:
                     expand = false;
                     break;
-                case "--top":
-                    topK = IntValue(args, ++i, "--top", ApiRoutes.MinTopK, ApiRoutes.MaxTopK);
+                case CliDefaults.FlagTop:
+                    topK = IntValue(args, ++i, CliDefaults.FlagTop, ApiRoutes.MinTopK, ApiRoutes.MaxTopK);
                     break;
-                case "--server":
-                    server = Value(args, ++i, "--server");
+                case CliDefaults.FlagServer:
+                    server = Value(args, ++i, CliDefaults.FlagServer);
                     break;
-                case "--index":
+                case CliDefaults.FlagIndex:
                     command = CliDefaults.CommandIndex;
                     if (i + 1 < args.Length && int.TryParse(args[i + 1], out _))
                     {
-                        threads = IntValue(args, ++i, "--index", ApiRoutes.MinThreads, ApiRoutes.MaxThreads);
+                        threads = IntValue(args, ++i, CliDefaults.FlagIndex, ApiRoutes.MinThreads, ApiRoutes.MaxThreads);
                     }
 
                     break;
-                case "--stats":
+                case CliDefaults.FlagStats:
                     command = CliDefaults.CommandStats;
                     break;
-                case "--health":
+                case CliDefaults.FlagHealth:
                     command = CliDefaults.CommandHealth;
                     break;
-                case "--help":
+                case CliDefaults.FlagHelp:
                     return new CliOptions(CliDefaults.CommandHelp, null, rest, expand, topK, server, threads);
-                case var flag when flag.StartsWith("--"):
+                case var flag when flag.StartsWith(CliDefaults.FlagPrefix):
                     throw Usage($"unknown option {flag}");
                 default:
-                    query = args[i];
+                    words.Add(args[i]);
                     break;
             }
         }
 
+        if (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw Usage($"{CliDefaults.FlagServer} must be an http(s) URL");
+        }
+
+        var query = words.Count > 0 ? string.Join(' ', words) : null;
         if (command == CliDefaults.CommandSearch && string.IsNullOrWhiteSpace(query))
         {
             throw Usage("a query is required");

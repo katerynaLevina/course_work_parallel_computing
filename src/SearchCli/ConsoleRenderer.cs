@@ -25,7 +25,7 @@ public class ConsoleRenderer(TextWriter output, bool useColor)
         for (var i = 0; i < results.Count; i++)
         {
             var result = results[i];
-            output.WriteLine($"{i + 1}. {result.Title}  ({result.Score.ToString("F4", CultureInfo.InvariantCulture)})");
+            output.WriteLine($"{i + 1}. {result.Title}  ({result.Score.ToString(CliDefaults.ScoreFormat, CultureInfo.InvariantCulture)})");
             output.WriteLine(SnippetIndent + Highlight(result.Snippet, highlight));
         }
 
