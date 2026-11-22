@@ -491,3 +491,4 @@ data/wiki/
 bench/results/*.tmp
 scripts/.venv/
 .superpowers/
+.claude/
