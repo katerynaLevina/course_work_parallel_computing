@@ -8,12 +8,6 @@ public class OllamaClientHealthTests
     private const string Model = "gemma4:e2b";
     private static readonly OllamaOptions Options = new("http://ollama:11434", Model, 1000);
 
-    private sealed class StubHandler(Func<HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
-            Task.FromResult(respond());
-    }
-
     private static Task<bool> IsAvailable(Func<HttpResponseMessage> respond) =>
         new OllamaClient(new HttpClient(new StubHandler(respond)), Options).IsAvailableAsync(CancellationToken.None);
 

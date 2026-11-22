@@ -44,6 +44,16 @@ public static class Defaults
 
     public const string OllamaTagsPath = "/api/tags";
     public const string OllamaLatestTag = ":latest";
+    public const string OllamaGeneratePath = "/api/generate";
+    public const string OllamaJsonFormat = "json";
+    public const double OllamaTemperature = 0;
+    public const int MaxExpandedTerms = 8;
+    public const string ExpansionPrompt =
+        "Return JSON {\"terms\":[...]} with up to 8 single English words that are synonyms or closely related " +
+        "search keywords for the query. No explanations. Query: ";
+    public const string ExpansionTimeoutError = "expansion timed out";
+    public const string ExpansionHttpError = "ollama request failed";
+    public const string ExpansionBadResponseError = "ollama returned an invalid response";
 
     public static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(2);
 }
