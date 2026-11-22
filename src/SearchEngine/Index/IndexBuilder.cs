@@ -1,0 +1,95 @@
+using System.Diagnostics;
+using System.Text;
+using SearchEngine.Concurrency;
+using SearchEngine.Text;
+
+namespace SearchEngine.Index;
+
+public static class IndexBuilder
+{
+    public static Task<SearchIndex> BuildAsync(IndexBuildOptions o, CancellationToken ct = default)
+    {
+        if (!Directory.Exists(o.DataDir))
+        {
+            throw new DirectoryNotFoundException($"Data directory not found: {o.DataDir}");
+        }
+
+        // The whole build is blocking work on our own worker threads, so run it off the caller's thread.
+        return Task.Run(() => Build(o, ct), ct);
+    }
+
+    private static SearchIndex Build(IndexBuildOptions o, CancellationToken ct)
+    {
+        var clock = Stopwatch.StartNew();
+
+        // Sequential: list and sort the files so a document's id (its array position) is the same on every run.
+        var files = Directory.EnumerateFiles(o.DataDir, o.Glob, SearchOption.AllDirectories).ToList();
+        files.Sort(StringComparer.Ordinal);
+
+        // Doc ids are fixed up front, so each task knows which slot to write to and no task has to
+        // coordinate with another to hand out ids. Slots are disjoint, so the array needs no lock.
+        var docs = new DocInfo[files.Count];
+        var terms = new ConcurrentTermIndex(o.Mode, o.Segments);
+
+        using var pool = new WorkerPool(o.Threads);
+
+        // Parallel: one pool job per batch of files (reading, tokenizing and counting are independent per file).
+        // Only terms.Add touches shared state, and the index locks per segment.
+        var batches = new List<Task>();
+        for (var first = 0; first < files.Count; first += o.BatchSize)
+        {
+            var start = first;
+            var end = Math.Min(first + o.BatchSize, files.Count);
+            batches.Add(pool.Submit(() =>
+            {
+                for (var id = start; id < end; id++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    docs[id] = IndexFile(files[id], id, o.DataDir, terms);
+                }
+            }));
+        }
+
+        Task.WaitAll(batches.ToArray());
+
+        // Parallel again on the same pool: every segment sorts its posting lists independently.
+        terms.Freeze(pool);
+
+        var avgLength = docs.Length == 0 ? 0 : docs.Average(d => d.Length);
+        return new SearchIndex(terms, docs, avgLength, clock.ElapsedMilliseconds, o.Threads);
+    }
+
+    private static DocInfo IndexFile(string path, int id, string dataDir, ConcurrentTermIndex terms)
+    {
+        // Decode explicitly as UTF-8 (no encoding sniffing); invalid bytes become the replacement character.
+        var text = Encoding.UTF8.GetString(File.ReadAllBytes(path));
+        var tokens = Tokenizer.Tokenize(text);
+
+        // Count tf locally first, so each term takes its segment lock once per document, not once per occurrence.
+        var tf = new Dictionary<string, int>();
+        foreach (var token in tokens)
+        {
+            tf[token] = tf.GetValueOrDefault(token) + 1;
+        }
+
+        foreach (var (term, count) in tf)
+        {
+            terms.Add(term, id, count);
+        }
+
+        var relative = Path.GetRelativePath(dataDir, path).Replace('\\', '/');
+        var docId = Path.ChangeExtension(relative, null);
+        return new DocInfo(docId, path, TitleOf(text, path), tokens.Count);
+    }
+
+    private static string TitleOf(string text, string path)
+    {
+        var firstLine = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0);
+        if (firstLine is null)
+        {
+            return Path.GetFileName(path);
+        }
+
+        return firstLine.Length > Defaults.TitleMaxLength ? firstLine[..Defaults.TitleMaxLength] : firstLine;
+    }
+}

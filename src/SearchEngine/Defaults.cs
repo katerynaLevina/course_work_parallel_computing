@@ -14,6 +14,9 @@ public static class Defaults
     public const string WorkerName = "worker";
 
     public const int IndexSegments = 256;
+    public const int IndexBatchSize = 64;
+    public const int IndexBuildThreads = 4;
+    public const int TitleMaxLength = 200;
     public const int SegmentInitialBuckets = 16;
     public const int SegmentHashShift = 16;
     public const double IndexLoadFactor = 0.75;
