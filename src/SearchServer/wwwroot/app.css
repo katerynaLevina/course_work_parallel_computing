@@ -4,7 +4,9 @@
   /* Motion */
   --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1.15);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 0.9, 0.6);
   --dur-fast: 180ms;
+  --dur-exit: 200ms;
   --dur: 320ms;
   --dur-slow: 520ms;
   --dur-shimmer: 1.4s;
@@ -15,6 +17,9 @@
   --rise: 10px;
   --slide: 28px;
   --blur-in: 8px;
+  --pop-scale: 0.88;
+  --press-scale: 0.96;
+  --stagger-skeleton: 120ms;
 
   /* Wallpaper */
   --wallpaper: linear-gradient(160deg, #e3e9fb, #f6e6f0);
@@ -32,6 +37,11 @@
   --layer-bg: rgba(255, 255, 255, 0.38);
   --layer-edge: inset 0 0.5px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.45);
   --shimmer: rgba(255, 255, 255, 0.75);
+  --button-edge: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 0.5px rgba(255, 255, 255, 0.3);
+  --button-pressed: inset 0 2px 5px rgba(0, 0, 0, 0.25), inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+  --knob: linear-gradient(#fff, #eef0f6);
+  --knob-shadow: 0 2px 6px rgba(0, 0, 0, 0.22), inset 0 0 0 0.5px rgba(0, 0, 0, 0.1), inset 0 1px 0 #fff;
+  --track-inset: inset 0 1px 2px rgba(0, 0, 0, 0.14);
   --glow: rgba(10, 100, 216, 0.35);
   --shadow: 0 30px 80px rgba(30, 30, 60, 0.25), 0 2px 8px rgba(0, 0, 0, 0.08);
 
@@ -65,6 +75,10 @@
     --layer-bg: rgba(255, 255, 255, 0.06);
     --layer-edge: inset 0 0.5px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 0.5px rgba(255, 255, 255, 0.07);
     --shimmer: rgba(255, 255, 255, 0.3);
+    --button-edge: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+    --knob: linear-gradient(rgba(255, 255, 255, 0.95), rgba(220, 222, 232, 0.9));
+    --knob-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 0.5px rgba(255, 255, 255, 0.4), inset 0 1px 0 #fff;
+    --track-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4);
     --glow: rgba(10, 132, 255, 0.45);
     --shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
 
@@ -204,6 +218,12 @@ body {
 
 .pills, .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
+/* The pipeline drops in under the search bar; its pills pop in one after another */
+.pipeline { animation: drop-in var(--dur) var(--ease-out) both; }
+.pipeline .pill { animation: pop-in var(--dur) var(--ease-spring) both; }
+.pipeline .pill:nth-child(2) { animation-delay: var(--stagger); }
+.pipeline .pill:nth-child(3) { animation-delay: calc(2 * var(--stagger)); }
+
 .pill {
   position: relative;
   overflow: hidden;
@@ -239,7 +259,11 @@ body {
 
 .pill[data-state="active"] i { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
 
-.pill[data-state="active"]::after {
+/* Light sweep shared by the active pill, the loading skeleton and the rebuild in progress */
+.pill[data-state="active"]::after,
+.skeleton span::after,
+.busy .rebuild::after,
+.status-chip.busy::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -291,15 +315,65 @@ body {
 }
 
 @keyframes pop-in {
-  from { opacity: 0; transform: scale(0.9); }
+  from { opacity: 0; transform: scale(var(--pop-scale)); }
 }
+
+@keyframes drop-in {
+  from { opacity: 0; transform: translateY(calc(-1 * var(--rise))); }
+}
+
+/* Exits: every element that app.js hides with leave() plays one of these, then is hidden */
+@keyframes lift-out {
+  to { opacity: 0; transform: translateY(calc(-1 * var(--rise))); filter: blur(calc(var(--blur-in) / 4)); }
+}
+
+@keyframes sink-out {
+  to { opacity: 0; transform: translateY(var(--rise)); filter: blur(calc(var(--blur-in) / 2)); }
+}
+
+@keyframes pop-out {
+  to { opacity: 0; transform: scale(var(--pop-scale)); }
+}
+
+.leaving { pointer-events: none; }
+.pipeline.leaving, .chips.leaving, .message.leaving, .skeleton.leaving { animation: lift-out var(--dur-exit) var(--ease-in) both; }
+.content.leaving { animation: sink-out var(--dur-exit) var(--ease-in) both; }
 
 .message {
   margin: 0;
   padding: 10px 18px;
   border-top: 0.5px solid var(--hairline);
   color: var(--text-dim);
+  animation: drop-in var(--dur) var(--ease-spring) both;
 }
+
+/* Loading skeleton: placeholder rows while the keyword search runs */
+.skeleton {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border-top: 0.5px solid var(--hairline);
+  animation: fade-in var(--dur) var(--ease-out) both;
+}
+
+.skeleton span {
+  position: relative;
+  overflow: hidden;
+  height: 52px;
+  border-radius: 10px;
+  --line: linear-gradient(var(--track), var(--track));
+  background:
+    var(--line) 10px 11px / 26px 30px no-repeat,
+    var(--line) 48px 13px / var(--title-width, 45%) 9px no-repeat,
+    var(--line) 48px 30px / var(--snippet-width, 70%) 7px no-repeat,
+    var(--layer-bg);
+  box-shadow: var(--layer-edge);
+}
+
+.skeleton span:nth-child(2) { --title-width: 35%; --snippet-width: 62%; }
+.skeleton span:nth-child(3) { --title-width: 52%; --snippet-width: 55%; }
+.skeleton span:nth-child(2)::after { animation-delay: var(--stagger-skeleton); }
+.skeleton span:nth-child(3)::after { animation-delay: calc(2 * var(--stagger-skeleton)); }
 
 .message.error { color: var(--error); }
 
@@ -430,6 +504,13 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1
   from { opacity: 0; transform: translateX(var(--slide)); filter: blur(var(--blur-in)); }
 }
 
+/* Closing reverses the slide; the panel narrows once the pane is gone */
+.preview.leaving { animation: slide-out var(--dur-exit) var(--ease-in) both; }
+
+@keyframes slide-out {
+  to { opacity: 0; transform: translateX(var(--slide)); filter: blur(var(--blur-in)); }
+}
+
 .preview-body.swap { animation: fade-in var(--dur) var(--ease-out) both; }
 
 .preview-body.ghost {
@@ -459,20 +540,27 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1
 }
 
 .status-chip {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   border: 0;
   border-radius: 999px;
-  padding: 3px 10px;
-  background: var(--pill-bg);
-  box-shadow: var(--layer-edge);
+  padding: 4px 11px;
+  background: linear-gradient(var(--sheen), transparent 60%), var(--pill-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), 0 1px 3px rgba(0, 0, 0, 0.08);
   color: var(--text-dim);
   font: 12px var(--font);
   cursor: pointer;
+  transition: color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-fast) var(--ease-spring);
 }
 
-.status-chip:hover { color: var(--text); }
+.status-chip:hover { color: var(--text); background: linear-gradient(var(--sheen), transparent 60%), var(--hover); }
+.status-chip:active { transform: scale(var(--press-scale)); }
+.status-chip[aria-expanded="true"] { color: var(--accent); box-shadow: var(--glass-edge), 0 0 12px var(--glow); }
 
 .dot {
   width: 8px;
@@ -491,31 +579,117 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1
   padding: 14px;
   display: grid;
   gap: 10px;
+  overflow: hidden;
   border-radius: 14px;
   background: linear-gradient(var(--sheen), transparent) 0 0 / 100% 48px no-repeat, var(--popover-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), var(--glass-edge);
-  transform-origin: top right;
-  animation: pop-in var(--dur) var(--ease-spring);
+  transform-origin: top right; /* the status chip sits just above its right edge */
+  animation: pop-in var(--dur) var(--ease-spring) both;
+}
+
+.popover.leaving { animation: pop-out var(--dur-exit) var(--ease-in) both; }
+
+/* Indeterminate progress line along the top edge while rebuilding */
+.popover::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity var(--dur);
+}
+
+.popover.busy::before { opacity: 1; animation: progress var(--dur-shimmer) ease-in-out infinite; }
+
+@keyframes progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
 }
 
 .popover label { display: flex; justify-content: space-between; font-size: 13px; }
-.popover input { width: 100%; accent-color: var(--accent); }
+.popover output { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
 
-.rebuild {
-  border: 0;
-  border-radius: 7px;
-  padding: 6px 10px;
-  background: var(--accent);
-  color: var(--accent-text);
-  font: 500 13px var(--font);
+/* Glass slider: inset translucent track filled up to the thumb (--fill set by app.js), glossy knob */
+.popover input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
   cursor: pointer;
 }
 
-.rebuild:disabled { opacity: 0.6; cursor: progress; }
+.popover input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(var(--accent), var(--accent)) 0 0 / calc(var(--fill, 0) * 100%) 100% no-repeat, var(--track);
+  box-shadow: var(--track-inset), var(--layer-edge);
+}
+
+.popover input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+  box-shadow: var(--track-inset), var(--layer-edge);
+}
+
+.popover input[type="range"]::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--accent); }
+
+.popover input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -7px;
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.popover input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+
+.popover input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+.popover input[type="range"]:active::-moz-range-thumb { transform: scale(1.15); }
+.popover input[type="range"]:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; border-radius: 999px; }
+
+/* Glass button: tinted accent glass with a top sheen and highlight edge; sinks in when pressed */
+.rebuild {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 12px;
+  background: linear-gradient(var(--sheen), transparent 60%), var(--accent);
+  box-shadow: var(--button-edge), 0 4px 14px var(--glow);
+  color: var(--accent-text);
+  font: 500 13px var(--font);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast), filter var(--dur-fast);
+}
+
+.rebuild:hover { filter: brightness(1.08); }
+.rebuild:active:not(:disabled) { transform: scale(var(--press-scale)); box-shadow: var(--button-pressed), 0 1px 4px var(--glow); }
+.rebuild:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+.rebuild:disabled { cursor: progress; filter: saturate(0.7); }
+
 .rebuild-result { margin: 0; font-size: 12px; color: var(--text-dim); }
 .rebuild-result:empty { display: none; }
+.rebuild-result.fresh { animation: drop-in var(--dur) var(--ease-spring) both; }
 
 [hidden] { display: none !important; }
 
@@ -528,6 +702,9 @@ mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1
   .preview { max-height: 50vh; }
   @keyframes slide-in {
     from { opacity: 0; transform: translateY(var(--rise)); filter: blur(var(--blur-in)); }
+  }
+  @keyframes slide-out {
+    to { opacity: 0; transform: translateY(var(--rise)); filter: blur(var(--blur-in)); }
   }
 }
 

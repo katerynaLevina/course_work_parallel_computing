@@ -51,7 +51,8 @@ function onSocketClose() {
   pending = [];
   if (!interrupted) return;
   if (retried) {
-    $("pipeline").hidden = true;
+    leave($("pipeline"));
+    leave($("skeleton"));
     return showMessage("Connection to the server was lost.", true);
   }
   retried = true;
@@ -62,7 +63,9 @@ function search(query) {
   lastQuery = query;
   latest++;
   pending.push(latest);
-  resetResults(); // the previous search's rows, selection and preview go away; nothing is selected until the user picks a row
+  // The previous search's rows, selection and preview go away; nothing is selected until the user picks a row.
+  // Once they have faded out, a skeleton holds the place of the results still being searched.
+  dismissResults(() => { if (isRunning()) show($("skeleton")); });
   resetPipeline();
   send(JSON.stringify({ query }));
 }
@@ -85,9 +88,39 @@ function onStage({ stage, data }) {
     setPill("pill-done", "done");
     retried = false;
   } else if (stage === STAGE.error) {
-    $("pipeline").hidden = true;
+    leave($("pipeline"));
+    leave($("skeleton"));
     showMessage(data.message, true);
   }
+}
+
+// ---------- Appear / disappear ----------
+
+/** Shows el, cancelling an exit still playing; its CSS entry animation runs again. */
+function show(el) {
+  el.onanimationend = null;
+  el.classList.remove("leaving");
+  el.hidden = false;
+}
+
+/** Plays el's exit animation (CSS class "leaving"), then hides it and runs after. */
+function leave(el, after = () => {}) {
+  const finish = () => {
+    el.onanimationend = null;
+    el.hidden = true;
+    el.classList.remove("leaving");
+    after();
+  };
+  if (el.getClientRects().length === 0 || reducedMotion.matches) return finish(); // not rendered: nothing to animate
+  el.classList.add("leaving");
+  el.onanimationend = (e) => { if (e.target === el && !e.pseudoElement) finish(); };
+}
+
+/** Replays a one-shot animation class on el. */
+function replay(el, className) {
+  el.classList.remove(className);
+  void el.offsetWidth; // reflow so the animation starts over
+  el.classList.add(className);
 }
 
 // ---------- Pipeline pills ----------
@@ -97,12 +130,12 @@ function setPill(id, state) {
 }
 
 function resetPipeline() {
-  $("pipeline").hidden = false;
+  show($("pipeline"));
   setPill("pill-expand", "active");
   setPill("pill-search", "pending");
   setPill("pill-done", "pending");
   $("search-time").textContent = "";
-  $("terms").replaceChildren();
+  leave($("terms"), () => $("terms").replaceChildren());
   showMessage("");
 }
 
@@ -113,6 +146,7 @@ function renderTerms(list, error) {
     note.title = error;
     chips.push(note);
   }
+  show($("terms"));
   $("terms").replaceChildren(...chips);
   // Each chip flies from the start of the search input to its place in the row, one after another.
   const from = input.getBoundingClientRect();
@@ -127,9 +161,10 @@ function renderTerms(list, error) {
 
 function showMessage(text, isError = false) {
   const el = $("message");
+  if (!text) return leave(el);
   el.textContent = text;
   el.classList.toggle("error", isError);
-  el.hidden = !text;
+  show(el);
 }
 
 // ---------- Results ----------
@@ -138,8 +173,12 @@ const DOC_ICON = '<svg viewBox="0 0 26 30" aria-hidden="true"><path d="M4 1h12l7
 
 function renderResults(list) {
   results = list;
+  selected = -1;
+  hidePreview();
+  $("skeleton").hidden = true;
   const top = Math.max(0, ...list.map((r) => r.score));
   resultsList.replaceChildren(...list.map((result, index) => resultRow(result, index, top)));
+  show($("content"));
   $("content").hidden = list.length === 0;
   if (list.length === 0) showMessage("No documents match “" + lastQuery + "”.");
 }
@@ -205,7 +244,7 @@ async function openPreview() {
   if (previewId !== null && previewId !== result.doc_id) crossFadePreview();
   previewId = result.doc_id;
   $("spotlight").classList.add("split");
-  $("preview").hidden = false;
+  show($("preview"));
   $("preview-title").textContent = result.title || result.doc_id;
   $("preview-id").textContent = result.doc_id;
   $("preview-text").textContent = "Loading…";
@@ -241,32 +280,41 @@ function crossFadePreview() {
     preview.append(ghost);
   }
   preview.scrollTop = 0;
-  body.classList.remove("swap");
-  void body.offsetWidth; // restart the fade-in
-  body.classList.add("swap");
+  replay(body, "swap");
 }
 
+/** Slides the preview out, then narrows the panel back. */
 function closePreview() {
   previewId = null;
-  $("spotlight").classList.remove("split");
+  leave($("preview"), hidePreview);
+}
+
+function hidePreview() {
+  show($("preview")); // cancels an exit still playing
   $("preview").hidden = true;
+  $("spotlight").classList.remove("split");
   $("preview").querySelectorAll(".ghost").forEach((ghost) => ghost.remove());
 }
 
-function resetResults() {
-  selected = -1;
+/** Forgets the shown results at once; the rows and preview fade out, then after runs. */
+function dismissResults(after = () => {}) {
+  previewId = null;
   results = [];
-  closePreview();
-  resultsList.replaceChildren();
-  $("content").hidden = true;
+  select(-1); // the fading rows lose their highlight at once
+  leave($("content"), () => {
+    hidePreview();
+    resultsList.replaceChildren();
+    after();
+  });
 }
 
 function clearAll() {
   latest++; // a search still in flight no longer renders
   input.value = "";
   lastQuery = "";
-  resetResults();
-  $("pipeline").hidden = true;
+  dismissResults();
+  leave($("pipeline"));
+  leave($("skeleton"));
   showMessage("");
 }
 
@@ -279,7 +327,7 @@ document.addEventListener("keydown", (e) => {
     input.select();
   } else if (e.key === "Escape") {
     e.preventDefault(); // keep the search input from clearing itself natively
-    if (!$("index-popover").hidden) return togglePopover(false);
+    if (popoverOpen()) return togglePopover(false);
     previewId !== null ? closePreview() : clearAll();
   } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && results.length > 0 && e.target.type !== "range") {
     e.preventDefault();
@@ -318,16 +366,41 @@ async function getJson(url) {
   }
 }
 
+const popoverOpen = () => $("status-chip").getAttribute("aria-expanded") === "true";
+
+/** The popover scales out of the status chip and back into it. */
 function togglePopover(open) {
-  $("index-popover").hidden = !open;
+  open ? show($("index-popover")) : leave($("index-popover"));
   $("status-chip").setAttribute("aria-expanded", String(open));
 }
 
-async function rebuild() {
+/** Rebuild in progress: shimmer on the button, popover and status chip. */
+function setBuilding(building) {
   const button = $("rebuild");
+  button.disabled = building;
+  button.textContent = building ? "Rebuilding…" : "Rebuild index";
+  $("index-popover").classList.toggle("busy", building);
+  $("index-popover").setAttribute("aria-busy", String(building));
+  $("status-chip").classList.toggle("busy", building);
+}
+
+function showRebuildResult(text) {
   const output = $("rebuild-result");
-  button.disabled = true;
-  output.textContent = "Building…";
+  output.textContent = text;
+  replay(output, "fresh");
+}
+
+/** Threads slider: shows the value and fills the glass track up to the thumb. */
+function syncThreads() {
+  const slider = $("threads");
+  $("threads-value").textContent = slider.value;
+  slider.style.setProperty("--fill", (slider.value - slider.min) / (slider.max - slider.min));
+}
+
+async function rebuild() {
+  setBuilding(true);
+  $("rebuild-result").textContent = "";
+  let text;
   try {
     const response = await fetch(ROUTES.index, {
       method: "POST",
@@ -335,18 +408,19 @@ async function rebuild() {
       body: JSON.stringify({ threads: Number($("threads").value) }),
     });
     const body = await response.json();
-    output.textContent = response.ok
+    text = response.ok
       ? body.documents_indexed.toLocaleString() + " documents in " + body.time_ms + " ms"
       : body.error || "Rebuild failed.";
   } catch {
-    output.textContent = "Rebuild failed.";
+    text = "Rebuild failed.";
   }
-  button.disabled = false;
+  setBuilding(false);
+  showRebuildResult(text);
   loadStatus();
 }
 
-$("status-chip").addEventListener("click", () => togglePopover($("index-popover").hidden));
-$("threads").addEventListener("input", (e) => { $("threads-value").textContent = e.target.value; });
+$("status-chip").addEventListener("click", () => togglePopover(!popoverOpen()));
+$("threads").addEventListener("input", syncThreads);
 $("rebuild").addEventListener("click", rebuild);
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".footer, .popover")) togglePopover(false);
@@ -357,4 +431,5 @@ new ResizeObserver(([entry]) => {
   $("panel").style.height = entry.borderBoxSize[0].blockSize + "px";
 }).observe($("panel-body"));
 
+syncThreads();
 loadStatus();
