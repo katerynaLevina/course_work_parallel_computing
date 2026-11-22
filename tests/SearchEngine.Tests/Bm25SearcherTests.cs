@@ -31,7 +31,7 @@ public class Bm25SearcherTests
     {
         using var corpus = new TempCorpus();
         var index = await BuildAsync(corpus,
-            ("common", "ocean wave"), ("rare", "ocean zebra"), ("c", "ocean"), ("d", "ocean"), ("e", "ocean"));
+            ("a", "ocean"), ("b", "ocean"), ("c", "ocean"), ("d", "ocean"), ("rare", "zebra"));
 
         var hits = Bm25Searcher.Search(index, ["ocean", "zebra"], [], Defaults.DefaultTopK);
 
