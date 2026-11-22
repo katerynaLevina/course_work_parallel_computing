@@ -26,6 +26,15 @@ public class CliOptionsTests
     }
 
     [Fact]
+    public void No_expand_alone_stays_on_the_websocket_path()
+    {
+        var options = CliOptions.Parse(["--no-expand", "q"]);
+
+        Assert.False(options.Rest);
+        Assert.False(options.Expand);
+    }
+
+    [Fact]
     public void Index_with_threads()
     {
         var options = CliOptions.Parse(["--index", "8"]);

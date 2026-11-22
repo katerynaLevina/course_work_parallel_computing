@@ -15,6 +15,8 @@ public static class SearchRequestRules
         _ => null,
     };
 
+    public static bool ShouldExpand(bool? expand) => expand ?? ApiRoutes.DefaultExpand;
+
     public static int ClampTopK(int? topK) => Math.Clamp(topK ?? Defaults.DefaultTopK, ApiRoutes.MinTopK, ApiRoutes.MaxTopK);
 
     public static SearchResultDto ToDto(SearchHit h) => new(h.DocId, h.Score, h.Snippet, h.Title);

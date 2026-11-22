@@ -3,12 +3,14 @@
 // Routes and stage names mirror src/SearchContracts/ApiRoutes.cs.
 const ROUTES = { ws: "/ws/search", health: "/api/health", stats: "/api/stats", index: "/api/index", doc: "/api/doc/" };
 const STAGE = { expansion: "query_expansion", keyword: "keyword_search", done: "done", error: "error" };
+const EXPAND_STORAGE_KEY = "expandQuery";
 const MIN_TERM_LENGTH = 2; // mirrors Defaults.MinTokenLength in src/SearchEngine/Defaults.cs
 
 const $ = (id) => document.getElementById(id);
 const input = $("search-input");
 const resultsList = $("results");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const expandToggle = $("expand-toggle");
 
 let socket = null;
 let queue = [];         // messages waiting for the socket to open
@@ -67,7 +69,7 @@ function search(query) {
   // Once they have faded out, a skeleton holds the place of the results still being searched.
   dismissResults(() => { if (isRunning()) show($("skeleton")); });
   resetPipeline();
-  send(JSON.stringify({ query }));
+  send(JSON.stringify({ query, expand: expandToggle.checked }));
 }
 
 function onStage({ stage, data }) {
@@ -78,7 +80,7 @@ function onStage({ stage, data }) {
   if (stage === STAGE.expansion) {
     terms = data.expanded_terms;
     renderTerms(terms, data.error);
-    setPill("pill-expand", "done");
+    setExpandPill(data.skipped ? "off" : "done");
     setPill("pill-search", "active");
   } else if (stage === STAGE.keyword) {
     $("search-time").textContent = data.time_ms + " ms";
@@ -129,9 +131,15 @@ function setPill(id, state) {
   $(id).dataset.state = state;
 }
 
+/** The expansion pill reads "Expansion off" (no shimmer) when the stage is skipped. */
+function setExpandPill(state) {
+  setPill("pill-expand", state);
+  $("expand-label").textContent = state === "off" ? "Expansion off" : "Expanding query";
+}
+
 function resetPipeline() {
   show($("pipeline"));
-  setPill("pill-expand", "active");
+  setExpandPill(expandToggle.checked ? "active" : "off");
   setPill("pill-search", "pending");
   setPill("pill-done", "pending");
   $("search-time").textContent = "";
@@ -347,6 +355,22 @@ $("search-form").addEventListener("submit", (e) => {
   if (query === lastQuery && selected >= 0 && previewId === null) return openPreview();
   retried = false;
   search(query);
+});
+
+// ---------- Expand toggle ----------
+
+try {
+  expandToggle.checked = localStorage.getItem(EXPAND_STORAGE_KEY) !== String(false);
+} catch {
+  // Storage is blocked; the toggle simply starts on.
+}
+
+expandToggle.addEventListener("change", () => {
+  try {
+    localStorage.setItem(EXPAND_STORAGE_KEY, String(expandToggle.checked));
+  } catch {
+    // Not remembered, but the choice still applies to this page.
+  }
 });
 
 // ---------- Status chip + index popover ----------

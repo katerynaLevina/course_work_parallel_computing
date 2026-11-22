@@ -73,14 +73,16 @@ curl -XPOST localhost:8080/api/index -H 'content-type: application/json' -d '{"t
 Клієнт надсилає текстове повідомлення (до 16 КБ):
 
 ```
-{"query": string, "top_k": int?}
+{"query": string, "top_k": int?, "expand": bool?}
 ```
+
+`expand` — за замовчуванням `true`; якщо `false`, розширення пропускається, але всі три стадії надсилаються.
 
 Сервер відповідає повідомленнями `{"stage": string, "data": object}` (для `done` поля `data` немає):
 
 | `stage` | `data` |
 |---|---|
-| `query_expansion` | `{"original": string, "expanded_terms": [string], "error": string}` (`error` є лише якщо розширення не вдалося; тоді `expanded_terms` порожній) |
+| `query_expansion` | `{"original": string, "expanded_terms": [string], "error": string}` (`error` є лише якщо розширення не вдалося; тоді `expanded_terms` порожній; `skipped: true` є лише якщо `expand` = `false`) |
 | `keyword_search` | `{"results": [Result], "time_ms": long}` |
 | `done` | — |
 | `error` | `{"message": string}` (немає `query`, запит задовгий, не JSON, повідомлення завелике, `index not built`) |
@@ -98,7 +100,7 @@ curl -XPOST localhost:8080/api/index -H 'content-type: application/json' -d '{"t
 
 Опції:
 - `--rest` — використати `POST /api/search` замість WebSocket;
-- `--no-expand` — без розширення запиту (через REST);
+- `--no-expand` — без розширення запиту;
 - `--top N` — кількість результатів (за замовчуванням 10);
 - `--server URL` — адреса сервера (за замовчуванням `$SEARCH_SERVER` або `http://localhost:8080`);
 - `--help` — довідка.
@@ -107,7 +109,7 @@ curl -XPOST localhost:8080/api/index -H 'content-type: application/json' -d '{"t
 
 ## Веб-інтерфейс
 
-Відкрийте `http://localhost:8080`.
+Відкрийте `http://localhost:8080`. Перемикач «Expand query» у рядку пошуку вимикає розширення запиту (вибір запам'ятовується в браузері й діє з наступного пошуку).
 
 ## Масштабованість
 

@@ -20,12 +20,14 @@ public record SearchResponse(IReadOnlyList<SearchResultDto> Results, long TimeMs
 
 public record DocResponse(string DocId, string Title, string Text);
 
-public record WsRequest(string? Query, int? TopK);
+public record WsRequest(string? Query, int? TopK, bool? Expand = null);
 
 public record StageMessage(string Stage, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? Data);
 
 public record ExpansionStageData(
-    string Original, IReadOnlyList<string> ExpandedTerms, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Error);
+    string Original, IReadOnlyList<string> ExpandedTerms,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Error,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Skipped = null);
 
 public record KeywordStageData(IReadOnlyList<SearchResultDto> Results, long TimeMs);
 

@@ -20,12 +20,17 @@
             </svg>
             <input id="search-input" type="search" placeholder="Search documents" aria-label="Search documents"
                    spellcheck="false" autofocus>
+            <label class="toggle">
+              <input type="checkbox" role="switch" id="expand-toggle" checked>
+              <span class="toggle-track" aria-hidden="true"></span>
+              <span class="toggle-label">Expand query</span>
+            </label>
             <kbd class="hint">⌘K</kbd>
           </form>
 
           <div class="pipeline" id="pipeline" hidden>
             <div class="pills">
-              <span class="pill" id="pill-expand" data-state="pending"><i></i><span>Expanding query</span></span>
+              <span class="pill" id="pill-expand" data-state="pending"><i></i><span id="expand-label">Expanding query</span></span>
               <span class="pill" id="pill-search" data-state="pending"><i></i><span>Searching</span><b id="search-time"></b></span>
               <span class="pill" id="pill-done" data-state="pending"><i></i><span>Done</span></span>
             </div>

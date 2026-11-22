@@ -79,7 +79,7 @@ public static class CliDefaults
 
         Options:
           --rest          use POST /api/search instead of the WebSocket stream
-          --no-expand     skip query expansion (uses REST)
+          --no-expand     skip query expansion
           --top N         number of results (default 10)
           --server URL    server address (default $SEARCH_SERVER or http://localhost:8080)
           --help          show this help

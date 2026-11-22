@@ -2,6 +2,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using SearchContracts;
+using SearchEngine.Llm;
 
 namespace SearchServer.Endpoints;
 
@@ -90,8 +91,9 @@ public static class WebSocketEndpoints
         var query = request!.Query!;
         try
         {
-            var expansion = await service.ExpandAsync(query, ct);
-            await SendAsync(socket, new StageMessage(ApiRoutes.StageQueryExpansion, new ExpansionStageData(query, expansion.Terms, expansion.Error)), ct);
+            var skipped = !SearchRequestRules.ShouldExpand(request.Expand);
+            var expansion = skipped ? new ExpansionResult([], null) : await service.ExpandAsync(query, ct);
+            await SendAsync(socket, new StageMessage(ApiRoutes.StageQueryExpansion, new ExpansionStageData(query, expansion.Terms, expansion.Error, skipped ? true : null)), ct);
 
             var keyword = await service.KeywordSearchAsync(query, expansion.Terms, SearchRequestRules.ClampTopK(request.TopK));
             var results = keyword.Hits.Select(SearchRequestRules.ToDto).ToList();

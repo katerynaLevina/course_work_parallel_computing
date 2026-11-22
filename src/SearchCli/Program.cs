@@ -44,7 +44,7 @@ try
             Console.WriteLine($"Status: {health.Status}");
             Console.WriteLine($"Ollama: {(health.Ollama ? CliDefaults.OllamaAvailable : CliDefaults.OllamaUnavailable)}");
             break;
-        case CliDefaults.CommandSearch when options.Rest || !options.Expand:
+        case CliDefaults.CommandSearch when options.Rest:
             var response = await client.SearchAsync(options.Query!, options.TopK, options.Expand, default);
             if (options.Expand)
             {
@@ -54,7 +54,7 @@ try
             renderer.Results(response.Results, response.TimeMs, options.Query!);
             break;
         default:
-            await client.StreamSearchAsync(options.Query!, options.TopK, renderer, default);
+            await client.StreamSearchAsync(options.Query!, options.TopK, options.Expand, renderer, default);
             break;
     }
 

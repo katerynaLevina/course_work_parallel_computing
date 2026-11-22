@@ -29,7 +29,7 @@ public static class SearchEndpoints
         var started = Stopwatch.GetTimestamp();
         try
         {
-            var expanded = (request.Expand ?? ApiRoutes.DefaultExpand) ? (await service.ExpandAsync(query, ct)).Terms : [];
+            var expanded = SearchRequestRules.ShouldExpand(request.Expand) ? (await service.ExpandAsync(query, ct)).Terms : [];
 
             var result = await service.KeywordSearchAsync(query, expanded, topK);
             var results = result.Hits.Select(SearchRequestRules.ToDto).ToList();

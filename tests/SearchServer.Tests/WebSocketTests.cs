@@ -29,9 +29,9 @@ public class WebSocketTests
         return JsonDocument.Parse(Encoding.UTF8.GetString(buffer, 0, result.Count)).RootElement;
     }
 
-    private static async Task<List<JsonElement>> Query(WebSocket ws, string query, CancellationToken ct)
+    private static async Task<List<JsonElement>> Query(WebSocket ws, string query, CancellationToken ct, string extra = "")
     {
-        await Send(ws, $"{{\"query\":\"{query}\"}}", ct);
+        await Send(ws, $"{{\"query\":\"{query}\"{extra}}}", ct);
         var messages = new List<JsonElement>();
         do
         {
@@ -56,6 +56,35 @@ public class WebSocketTests
         Assert.Equal("ocean", messages[0].GetProperty("data").GetProperty("original").GetString());
         Assert.True(messages[1].GetProperty("data").TryGetProperty("time_ms", out _));
         Assert.False(messages[2].TryGetProperty("data", out _));
+    }
+
+    [Fact]
+    public async Task Default_request_calls_the_expander_and_is_not_marked_skipped()
+    {
+        using var cts = new CancellationTokenSource(Timeout);
+        using var f = new ServerFactory();
+        await Index(f);
+        using var ws = await Connect(f, cts.Token);
+        var messages = await Query(ws, "ocean", cts.Token);
+        Assert.Equal(1, f.Expander.Calls);
+        Assert.False(messages[0].GetProperty("data").TryGetProperty("skipped", out _));
+    }
+
+    [Fact]
+    public async Task Expand_false_skips_the_expander_but_still_streams_all_stages()
+    {
+        using var cts = new CancellationTokenSource(Timeout);
+        using var f = new ServerFactory();
+        f.Expander.Terms = ["sea"];
+        await Index(f);
+        using var ws = await Connect(f, cts.Token);
+        var messages = await Query(ws, "term3", cts.Token, ",\"expand\":false");
+        Assert.Equal([ApiRoutes.StageQueryExpansion, ApiRoutes.StageKeywordSearch, ApiRoutes.StageDone], Stages(messages));
+        Assert.Equal(0, f.Expander.Calls);
+        var expansion = messages[0].GetProperty("data");
+        Assert.Equal(0, expansion.GetProperty("expanded_terms").GetArrayLength());
+        Assert.True(expansion.GetProperty("skipped").GetBoolean());
+        Assert.Equal("doc03", messages[1].GetProperty("data").GetProperty("results")[0].GetProperty("doc_id").GetString());
     }
 
     [Fact]

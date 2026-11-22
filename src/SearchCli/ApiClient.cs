@@ -21,13 +21,13 @@ public sealed class ApiClient(string server) : IDisposable
     public Task<HealthResponse> HealthAsync(CancellationToken ct) => GetAsync<HealthResponse>(ApiRoutes.Health, ct);
 
     /// <summary>Streams a search over the WebSocket, rendering each stage as soon as it arrives.</summary>
-    public async Task StreamSearchAsync(string query, int topK, ConsoleRenderer renderer, CancellationToken ct)
+    public async Task StreamSearchAsync(string query, int topK, bool expand, ConsoleRenderer renderer, CancellationToken ct)
     {
         using var socket = new ClientWebSocket();
         var wsUri = new UriBuilder(http.BaseAddress!) { Scheme = http.BaseAddress!.Scheme == Uri.UriSchemeHttps ? Uri.UriSchemeWss : Uri.UriSchemeWs, Path = ApiRoutes.WsSearch };
         await socket.ConnectAsync(wsUri.Uri, ct);
 
-        var request = JsonSerializer.SerializeToUtf8Bytes(new WsRequest(query, topK), ApiRoutes.Json);
+        var request = JsonSerializer.SerializeToUtf8Bytes(new WsRequest(query, topK, expand), ApiRoutes.Json);
         await socket.SendAsync(request, WebSocketMessageType.Text, true, ct);
 
         while (true)
@@ -37,7 +37,11 @@ public sealed class ApiClient(string server) : IDisposable
             switch (message.Stage)
             {
                 case ApiRoutes.StageQueryExpansion:
-                    renderer.Expansion(data.Deserialize<ExpansionStageData>(ApiRoutes.Json)!.ExpandedTerms);
+                    if (expand)
+                    {
+                        renderer.Expansion(data.Deserialize<ExpansionStageData>(ApiRoutes.Json)!.ExpandedTerms);
+                    }
+
                     break;
                 case ApiRoutes.StageKeywordSearch:
                     var keyword = data.Deserialize<KeywordStageData>(ApiRoutes.Json)!;
