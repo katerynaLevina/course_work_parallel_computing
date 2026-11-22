@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using SearchContracts;
 using SearchEngine;
+using SearchEngine.Search;
 
 namespace SearchServer.Endpoints;
 
@@ -29,14 +30,14 @@ public static class SearchEndpoints
             return IndexEndpoints.Error(StatusCodes.Status400BadRequest, ApiRoutes.ErrorQueryTooLong);
         }
 
-        var topK = Math.Clamp(request.TopK ?? Defaults.DefaultTopK, ApiRoutes.MinTopK, ApiRoutes.MaxTopK);
+        var topK = ClampTopK(request.TopK);
         var started = Stopwatch.GetTimestamp();
         try
         {
             var expanded = (request.Expand ?? ApiRoutes.DefaultExpand) ? (await service.ExpandAsync(query, ct)).Terms : [];
 
             var result = await service.KeywordSearchAsync(query, expanded, topK);
-            var results = result.Hits.Select(h => new SearchResultDto(h.DocId, h.Score, h.Snippet, h.Title)).ToList();
+            var results = result.Hits.Select(ToDto).ToList();
             return Results.Ok(new SearchResponse(results, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds, expanded));
         }
         catch (IndexNotBuiltException e)
@@ -44,6 +45,10 @@ public static class SearchEndpoints
             return IndexEndpoints.Error(StatusCodes.Status409Conflict, e.Message);
         }
     }
+
+    public static int ClampTopK(int? topK) => Math.Clamp(topK ?? Defaults.DefaultTopK, ApiRoutes.MinTopK, ApiRoutes.MaxTopK);
+
+    public static SearchResultDto ToDto(SearchHit h) => new(h.DocId, h.Score, h.Snippet, h.Title);
 
     private static async Task<IResult> GetDocAsync(string docId, EngineState state, CancellationToken ct)
     {

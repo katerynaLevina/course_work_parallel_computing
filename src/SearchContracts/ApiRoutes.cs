@@ -16,6 +16,20 @@ public static class ApiRoutes
 
     public const string Doc = DocPrefix + "{**docId}";
 
+    public const string WsSearch = "/ws/search";
+
+    public const string StageQueryExpansion = "query_expansion";
+
+    public const string StageKeywordSearch = "keyword_search";
+
+    public const string StageDone = "done";
+
+    public const string StageError = "error";
+
+    public const int MaxWsMessageBytes = 16 * 1024;
+
+    public const int WsReceiveBufferBytes = 4096;
+
     public const bool DefaultExpand = true;
 
     public const string HealthStatusOk = "ok";
@@ -39,6 +53,10 @@ public static class ApiRoutes
     public const string ErrorQueryTooLong = "query is too long";
 
     public const string ErrorUnknownMode = "mode must be 'keyword'";
+
+    public const string ErrorInvalidJson = "message must be a JSON object";
+
+    public const string ErrorMessageTooLarge = "message is too large";
 
     public const string ErrorDocNotFound = "document not found";
 

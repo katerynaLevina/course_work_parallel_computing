@@ -21,9 +21,11 @@ builder.Services.AddSingleton<SearchService>();
 builder.Services.AddSingleton<IndexService>();
 
 var app = builder.Build();
+app.UseWebSockets();
 HealthEndpoints.Map(app);
 IndexEndpoints.Map(app);
 SearchEndpoints.Map(app);
+WebSocketEndpoints.Map(app);
 app.Run();
 
 public partial class Program;
