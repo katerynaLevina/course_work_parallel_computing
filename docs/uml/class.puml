@@ -1,5 +1,5 @@
 @startuml class
-title Search engine: planned classes
+title Search engine: classes
 
 skinparam classAttributeIconSize 0
 skinparam packageStyle rectangle
@@ -97,13 +97,16 @@ package "Search" {
   }
 
   class Bm25Searcher <<static>> {
-    +{static} Search(index : SearchIndex, originalTerms, expandedTerms, topK : int) : IReadOnlyList~SearchHit~
+    +{static} Search(index, originalTerms, expandedTerms, topK) : IReadOnlyList~SearchHit~
   }
 
   class SnippetBuilder <<static>> {
     +{static} Build(text : string, terms, radius : int) : string
   }
 
+}
+
+package "Llm" {
   class ExpansionResult <<record>> {
     +Terms : IReadOnlyList~string~
     +Error : string?
@@ -126,6 +129,7 @@ package "Search" {
     +Url : string
     +Model : string
     +TimeoutMs : int
+    +NumThread : int
   }
 }
 
@@ -133,6 +137,7 @@ package "Server" {
   class EngineState {
     +Current : SearchIndex?
     +Publish(index : SearchIndex)
+    +Clear()
     +TryBeginBuild() : bool
     +EndBuild()
   }
@@ -190,5 +195,16 @@ SearchService --> WorkerPool : search pool
 SearchService ..> Bm25Searcher
 SearchService ..> ExpansionResult
 ServerOptions *-- OllamaOptions
+
+'' Layers top to bottom: Server -> Search, Llm -> Index -> Concurrency, so the diagram fits a portrait page
+SearchService -[hidden]down- SnippetBuilder
+SnippetBuilder -[hidden]down- IndexBuilder
+SearchHit -[hidden]down- IndexBuilder
+Posting -[hidden]down- WorkerPool
+DocInfo -[hidden]down- BlockingQueue
+EngineState -[hidden]down- OllamaClient
+OllamaClient -[hidden]down- IQueryExpander
+IQueryExpander -[hidden]down- IOllamaHealth
+ExpansionResult -[hidden]down- OllamaOptions
 
 @enduml
