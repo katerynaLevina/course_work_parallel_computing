@@ -96,6 +96,18 @@ public class Bm25SearcherTests
     }
 
     [Fact]
+    public async Task File_deleted_after_indexing_gives_empty_snippet()
+    {
+        using var corpus = new TempCorpus();
+        var index = await BuildAsync(corpus, ("gone", "ocean"));
+        File.Delete(index.Docs[0].Path);
+
+        var hit = Assert.Single(Bm25Searcher.Search(index, ["ocean"], [], Defaults.DefaultTopK));
+
+        Assert.Equal("", hit.Snippet);
+    }
+
+    [Fact]
     public async Task Unknown_terms_return_empty()
     {
         using var corpus = new TempCorpus();

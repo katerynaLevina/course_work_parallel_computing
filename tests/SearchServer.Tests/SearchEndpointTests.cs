@@ -122,6 +122,15 @@ public class SearchEndpointTests
     }
 
     [Fact]
+    public async Task Doc_deleted_after_indexing_is_404()
+    {
+        using var f = new ServerFactory();
+        var c = await IndexedClient(f);
+        File.Delete(Path.Combine(f.DataDir, "doc05.txt"));
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync(ApiRoutes.DocPrefix + "doc05")).StatusCode);
+    }
+
+    [Fact]
     public async Task Search_before_index_does_not_call_expander()
     {
         using var f = new ServerFactory();

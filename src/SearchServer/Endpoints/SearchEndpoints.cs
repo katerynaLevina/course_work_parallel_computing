@@ -48,6 +48,14 @@ public static class SearchEndpoints
             return IndexEndpoints.Error(StatusCodes.Status404NotFound, ApiRoutes.ErrorDocNotFound);
         }
 
-        return Results.Ok(new DocResponse(doc.DocId, doc.Title, await File.ReadAllTextAsync(doc.Path, ct)));
+        try
+        {
+            return Results.Ok(new DocResponse(doc.DocId, doc.Title, await File.ReadAllTextAsync(doc.Path, ct)));
+        }
+        catch (IOException)
+        {
+            // Indexed, but the file was removed from disk since.
+            return IndexEndpoints.Error(StatusCodes.Status404NotFound, ApiRoutes.ErrorDocNotFound);
+        }
     }
 }

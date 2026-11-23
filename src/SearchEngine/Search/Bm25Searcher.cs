@@ -30,9 +30,21 @@ public static class Bm25Searcher
         return top.Select(t =>
         {
             var doc = index.Docs[t.DocId];
-            var snippet = SnippetBuilder.Build(File.ReadAllText(doc.Path), allTerms);
-            return new SearchHit(doc.DocId, doc.Title, Math.Round(t.Score / best, Defaults.ScoreDecimals), snippet);
+            return new SearchHit(doc.DocId, doc.Title, Math.Round(t.Score / best, Defaults.ScoreDecimals), SnippetOf(doc, allTerms));
         }).ToList();
+    }
+
+    /// <summary>The file is read at query time, so it may have been removed since indexing: then no snippet.</summary>
+    private static string SnippetOf(DocInfo doc, List<string> terms)
+    {
+        try
+        {
+            return SnippetBuilder.Build(File.ReadAllText(doc.Path), terms);
+        }
+        catch (IOException)
+        {
+            return "";
+        }
     }
 
     private static void AddScores(SearchIndex index, HashSet<string> terms, double weight, double[] scores)
