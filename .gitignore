@@ -487,7 +487,7 @@ $RECYCLE.BIN/
 *.swp
 
 # Project
-data/wiki/
+data/wiki*/
 bench/results/*.tmp
 scripts/.venv/
 .superpowers/
