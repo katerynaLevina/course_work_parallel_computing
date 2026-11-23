@@ -47,7 +47,7 @@ public static class CliDefaults
     /// <summary>Above the server's default Ollama timeout (60 s) so a slow expansion is not cut off by the client.</summary>
     public static readonly TimeSpan HttpTimeout = TimeSpan.FromSeconds(120);
 
-    /// <summary>A build can take minutes, and aborting the request cancels it on the server.</summary>
+    /// <summary>A build can take minutes; the server finishes it even if the client stops waiting.</summary>
     public static readonly TimeSpan IndexTimeout = Timeout.InfiniteTimeSpan;
 
     public const string MessageUnreachable = "server not reachable at {0}";

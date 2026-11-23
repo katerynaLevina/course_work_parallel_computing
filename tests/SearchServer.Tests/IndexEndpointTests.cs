@@ -93,6 +93,22 @@ public class IndexEndpointTests
     }
 
     [Fact]
+    public async Task Missing_data_dir_keeps_the_old_index()
+    {
+        using var f = new ServerFactory();
+        var state = f.Services.GetRequiredService<EngineState>();
+        var options = f.Services.GetRequiredService<ServerOptions>();
+        await new IndexService(state, options).BuildAsync(2, LockMode.Striped, 16, default);
+        var old = state.Current;
+
+        var missing = options with { DataDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()) };
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+            () => new IndexService(state, missing).BuildAsync(2, LockMode.Striped, 16, default));
+
+        Assert.Same(old, state.Current);
+    }
+
+    [Fact]
     public async Task Missing_data_dir_is_400()
     {
         using var f = new ServerFactory { DataDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()) };

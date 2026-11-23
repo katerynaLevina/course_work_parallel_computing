@@ -15,6 +15,12 @@ public sealed class IndexService(EngineState state, ServerOptions options)
 
         try
         {
+            // Checked before the old index is released, so an obviously failing build keeps it.
+            if (!Directory.Exists(options.DataDir))
+            {
+                throw new DirectoryNotFoundException($"Data directory not found: {options.DataDir}");
+            }
+
             // The old and the new index do not fit in memory together: release the old one first.
             state.Clear();
             var index = await IndexBuilder.BuildAsync(

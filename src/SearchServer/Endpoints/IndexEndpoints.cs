@@ -16,7 +16,7 @@ public static class IndexEndpoints
     }
 
     private static async Task<IResult> BuildAsync(
-        IndexRequest? request, IndexService service, ServerOptions options, CancellationToken ct)
+        IndexRequest? request, IndexService service, ServerOptions options)
     {
         var threads = request?.Threads ?? options.SearchThreads;
         var segments = request?.Segments ?? Defaults.IndexSegments;
@@ -37,7 +37,9 @@ public static class IndexEndpoints
 
         try
         {
-            var index = await service.BuildAsync(threads, mode, segments, ct);
+            // Not tied to the request: the old index is already gone, so a client that disconnects
+            // must not cancel the build and leave the server with no index at all.
+            var index = await service.BuildAsync(threads, mode, segments, CancellationToken.None);
             return Results.Ok(new IndexResponse(ApiRoutes.HealthStatusOk, index.Docs.Length, index.BuildTimeMs, index.ThreadsUsed, ModeName(mode)));
         }
         catch (BuildInProgressException e)
